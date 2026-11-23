@@ -250,9 +250,9 @@ jobs:
           RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
-          target_args=()
-          if [[ -n "$RUST_TARGET" ]]; then target_args=(--target "$RUST_TARGET"); fi
-          cargo build --release --locked -p host-core "${target_args[@]}" &
+          set -- --release --locked -p host-core
+          if [[ -n "$RUST_TARGET" ]]; then set -- "$@" --target "$RUST_TARGET"; fi
+          cargo build "$@" &
           host_build_pid=$!
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
 
