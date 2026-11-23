@@ -291,7 +291,7 @@
   runners are available.
 - **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
   the unpacked app with `codesign -dv --verbose=4` and confirm authority
-  `Developer ID Application: XingYu Liu (DUV63RKYTW)`. 3) Run
+  the configured publisher's Developer ID Application certificate. 3) Run
   `codesign --verify --deep --strict --verbose=2`,
   `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
   against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
@@ -1349,3 +1349,15 @@
 ## E2E-ISSUE-1707
 
 Use synthetic Darwin x64/arm64 uname responses through production SSH bootstrap, serialize its code/details as IPC does, and resolve the renderer error. The platform explanation appears, no checksum or upload occurs. Linux and other bootstrap failures keep existing messages. Coverage: remote-host-ssh-bootstrap.test.mjs and remote-host-errors.test.mjs.
+
+## E2E-IAGENT-release-feed
+
+- Build a matching tag on the fork and verify the Windows ia32/x64 and
+  macOS Intel/Apple Silicon assets belong to that tag.
+- An installed Windows app discovers only its architecture's NSIS update.
+  An unsigned macOS build discovers the manual feed and links to the GitHub
+  Release. A Developer ID-signed build uses the signed ZIP feed and can
+  install the update after restart.
+- Controller coverage runs with the updater and packaging boundaries
+  controlled. A signed installed-app upgrade needs certificates for both
+  releases and a native macOS test machine.

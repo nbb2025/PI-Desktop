@@ -4,8 +4,7 @@
 
 ## Requirement link / 需求关联
 
-<!-- Collaboration rules: https://github.com/vastsa/PI-Desktop/issues/2137 -->
-<!-- 协作规范见 https://github.com/vastsa/PI-Desktop/issues/2137 -->
+<!-- Follow the repository workflow in AGENTS.md. -->
 
 - [ ] Linked requirement issue / 已关联对应的需求 Issue：`Closes #N` / `Refs #N`
 - [ ] Issue explains the background and the expected outcome / Issue 已说明需求背景和期望效果

@@ -5,12 +5,12 @@
  * .github/workflows/release.yml. Discovery always tracks the latest stable
  * release (`allowPrerelease = false`) so RC installs still graduate to newer
  * stables. Delivery mode per install:
- *  - Windows NSIS / Linux AppImage / packaged macOS → full in-app flow: silent
+ *  - Windows NSIS / Linux AppImage / Developer ID-signed macOS → full in-app flow: silent
  *    background download, "restart to update" prompt, install-on-quit fallback.
  *  - Windows ZIP / legacy portable (`piDistribution = "zip"` or
  *    `PORTABLE_EXECUTABLE_FILE`) → notify + link. The
  *    NSIS installer must not replace a no-install run.
- *  - Linux deb (no $APPIMAGE in env) → notify + link.
+ *  - Unsigned macOS and Linux deb (no $APPIMAGE in env) → notify + link.
  *  - Unpackaged dev runs → disabled (no app-update.yml in resources).
  *
  * The installer download cache lives in the user cache directory rather than
@@ -25,6 +25,7 @@ import electronUpdaterPkg from "electron-updater";
 import type { AppUpdater, UpdateInfo, ProgressInfo } from "electron-updater";
 import {
   formatChangelogNotes,
+  GITHUB_REPO,
   IPC,
   type UpdatePreference,
   type UpdateState,
@@ -43,6 +44,7 @@ import {
   UPDATE_CHECK_TIMEOUT_CODE,
 } from "./update-timeout";
 import {
+  releaseUpdateChannel,
   resolveDefaultUpdatePreference,
   resolveEffectiveUpdatePreference,
   resolveStoredUpdatePreference,
@@ -72,7 +74,7 @@ function createRelocatedUpdater(
   return platform === "win32" ? new RelocatedNsisUpdater(baseCachePath) : null;
 }
 
-export const RELEASES_URL = "https://github.com/vastsa/PI-Desktop/releases/latest";
+export const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 
 const AUTO_CHECK_INITIAL_DELAY_MS = 15_000;
 const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -111,6 +113,8 @@ export type UpdaterOptions = {
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
   distribution?: WindowsDistribution;
+  arch?: string;
+  macUpdatesCapable?: boolean;
 };
 
 export class AppUpdaterController {
@@ -123,6 +127,7 @@ export class AppUpdaterController {
   private readonly distribution?: WindowsDistribution;
   private readonly defaultPreference: UpdatePreference;
   private readonly automaticSupported: boolean;
+  private readonly channel?: string;
   private readonly readUpdateSettings?: () => Promise<UpdaterSettings>;
   private readonly persistLastNotifiedVersion?: (version: string) => Promise<void>;
   private readonly persistDismissedVersion?: (
@@ -157,22 +162,15 @@ export class AppUpdaterController {
   private readonly autoUpdater: AppUpdater;
   private readonly cacheMaintenance: UpdateCacheMaintenance;
 
-  private readPackagedDistribution(
-    isPackaged: boolean,
-  ): WindowsDistribution | undefined {
-    if (!isPackaged) return undefined;
+  private readPackagedMetadata(): Record<string, unknown> {
     try {
       const packageJson = JSON.parse(
         readFileSync(join(app.getAppPath(), "package.json"), "utf8"),
       ) as unknown;
       if (typeof packageJson !== "object" || packageJson === null) {
-        return undefined;
+        return {};
       }
-      const distribution = (packageJson as Record<string, unknown>)
-        .piDistribution;
-      return distribution === "installed" || distribution === "zip" || distribution === "portable"
-        ? distribution
-        : undefined;
+      return packageJson as Record<string, unknown>;
     } catch (error) {
       this.logger.app(
         "updater",
@@ -180,7 +178,7 @@ export class AppUpdaterController {
         "packaged distribution metadata unavailable",
         { data: { detail: String(error) } },
       );
-      return undefined;
+      return {};
     }
   }
 
@@ -190,27 +188,29 @@ export class AppUpdaterController {
     this.getLocale = options.getLocale ?? (() => "en");
     const platform = options.platform ?? process.platform;
     const isPackaged = options.isPackaged ?? app.isPackaged;
-    const distribution =
-      options.distribution ??
-      (platform === "win32"
-        ? this.readPackagedDistribution(isPackaged)
-        : undefined);
+    const metadata = isPackaged && (platform === "win32" || platform === "darwin")
+      ? this.readPackagedMetadata() : {};
+    const marker = metadata.piDistribution;
+    const distribution = options.distribution ??
+      (marker === "installed" || marker === "zip" || marker === "portable" ? marker : undefined);
+    const macUpdatesCapable = options.macUpdatesCapable ?? metadata.piMacUpdates !== false;
     this.platform = platform;
     this.isPackaged = isPackaged;
     this.env = process.env;
     this.distribution = distribution;
-    this.defaultPreference = resolveDefaultUpdatePreference(
+    this.defaultPreference = platform === "darwin" && !macUpdatesCapable ? "manual" : resolveDefaultUpdatePreference(
       platform,
       isPackaged,
       this.env,
       distribution,
     );
     this.preference = this.defaultPreference;
-    this.automaticSupported = supportsAutomaticUpdates(
+    this.automaticSupported = (platform !== "darwin" || macUpdatesCapable) && supportsAutomaticUpdates(
       platform,
       isPackaged,
       this.env,
     );
+    this.channel = releaseUpdateChannel(platform, options.arch ?? process.arch, macUpdatesCapable);
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
     this.persistDismissedVersion = options.persistDismissedVersion;
@@ -466,6 +466,9 @@ export class AppUpdaterController {
     // newer stable release such as 0.2.2. Always track GitHub's latest
     // stable release so RC installs can graduate to stable.
     this.autoUpdater.allowPrerelease = false;
+    if (this.channel) this.autoUpdater.channel = this.channel;
+    // Selecting a channel in electron-updater opts into downgrades by default.
+    this.autoUpdater.allowDowngrade = false;
     // Only automatic mode may install on quit; manual mode never hands an
     // installer a no-install/portable directory.
     this.autoUpdater.logger = {

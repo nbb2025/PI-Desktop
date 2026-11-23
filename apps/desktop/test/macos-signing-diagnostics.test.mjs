@@ -133,7 +133,7 @@ exit 0`,
 function runDiagnostics(bin, { args = [], env = {} } = {}) {
   return spawnSync("bash", [diagnosticsScript, ...args], {
     encoding: "utf8",
-    env: { ...BASE_ENV, PATH: `${bin}:${process.env.PATH}`, ...env },
+    env: { ...BASE_ENV, PATH: `${bin}:${process.env.PATH}`, MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME, ...env },
   });
 }
 

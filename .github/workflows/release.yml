@@ -7,13 +7,13 @@
 #   git push origin <branch> v0.2.0        # push → this workflow builds & publishes
 #
 # Builds installers for every platform defined in the electron-builder config
-# (macOS dmg/zip arm64 and x64, Windows NSIS and portable ZIP x64, Linux
+# (macOS dmg/zip arm64 and x64, Windows NSIS x64 and ia32, portable ZIP x64, Linux
 # AppImage/deb/rpm x64 and arm64), each
 # with its native pi-desktop-host-core Rust sidecar. The Linux app.asar is also
 # exported as a system-Electron repackaging asset, and all outputs — with their
 # electron-updater latest*.yml feeds — are published to the GitHub Release
-# (D126/D285/D364/D603). macOS tag artifacts are Developer ID-signed, notarized, and
-# stapled before upload (D450 / ADR 0289).
+# (D126/D285/D364/D603). macOS auto-update feeds require Developer ID signing,
+# notarization and stapling. Without credentials, macOS publishes the manual feed.
 #
 # It also builds the headless `pi-host` bundle for both Linux architectures the
 # desktop publishes and publishes each as
@@ -44,6 +44,44 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  configuration:
+    name: Resolve release signing
+    runs-on: ubuntu-latest
+    outputs:
+      macos_signed: ${{ steps.signing.outputs.macos_signed }}
+    steps:
+      - id: signing
+        name: Select the macOS signing lane
+        env:
+          SIGNING_REQUIRED: ${{ github.event_name == 'workflow_dispatch' && inputs.sign_macos }}
+          SIGNING_DISABLED: ${{ github.event_name == 'workflow_dispatch' && !inputs.sign_macos }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          if [[ "$SIGNING_DISABLED" == "true" ]]; then
+            echo "macos_signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          credentials=(CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID)
+          missing=()
+          for secret in "${credentials[@]}"; do
+            [[ -n "${!secret}" ]] || missing+=("$secret")
+          done
+          if ((${#missing[@]} == 0)); then
+            [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo "::error::Invalid APPLE_TEAM_ID"; exit 1; }
+            echo "macos_signed=true" >> "$GITHUB_OUTPUT"
+          elif [[ "$SIGNING_REQUIRED" == "true" ]] || ((${#missing[@]} != ${#credentials[@]})); then
+            echo "::error::Incomplete macOS signing configuration: ${missing[*]}"
+            exit 1
+          else
+            echo "::notice::macOS will be published for manual installation."
+            echo "macos_signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     # Same gate as ci.yml. A tag push does not trigger ci.yml, so without this
     # job a broken tree could be built and published untested.
@@ -73,6 +111,10 @@ jobs:
       - name: Typecheck Desktop
         run: pnpm --filter @pi-desktop/desktop typecheck
 
+      - name: Verify stable release documentation
+        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+        run: pnpm check:release-docs
+
       - name: Lint
         run: pnpm lint
 
@@ -84,10 +126,9 @@ jobs:
 
   build:
     name: Build ${{ matrix.name }}
-    needs: verify
+    needs: [configuration, verify]
     env:
-      # Tag pushes always sign. workflow_dispatch signs unless explicitly disabled.
-      MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}
+      MACOS_SIGN_RELEASE: ${{ needs.configuration.outputs.macos_signed }}
     strategy:
       fail-fast: false
       matrix:
@@ -110,6 +151,13 @@ jobs:
             os: windows-latest
             arch: x64
             artifact: windows-x64
+            platform: windows
+            dist: dist:win
+          - name: Windows x86
+            os: windows-latest
+            arch: ia32
+            rust_target: i686-pc-windows-msvc
+            artifact: windows-ia32
             platform: windows
             dist: dist:win
           - name: Linux x64
@@ -191,13 +239,19 @@ jobs:
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Prepare package inputs
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
         run: |
           set -euo pipefail
-          cargo build --release --locked -p host-core &
+          target_args=()
+          if [[ -n "$RUST_TARGET" ]]; then target_args=(--target "$RUST_TARGET"); fi
+          cargo build --release --locked -p host-core "${target_args[@]}" &
           host_build_pid=$!
           trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
 
@@ -206,25 +260,35 @@ jobs:
 
           wait "$host_build_pid"
           trap - EXIT
+          if [[ -n "$RUST_TARGET" ]]; then
+            mkdir -p target/release
+            cp "target/$RUST_TARGET/release/pi-desktop-host-core.exe" target/release/
+          fi
 
       - name: Package installers (${{ matrix.dist }})
-        if: matrix.platform != 'macos'
+        if: matrix.platform != 'macos' && matrix.arch != 'ia32'
         # The dist scripts pass --publish never themselves: electron-builder
         # must not self-publish on tag builds (no token; softprops owns it).
         # The explicit architecture keeps the package and native Rust sidecar
         # aligned with the runner selected by this matrix entry.
-        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} -- --${{ matrix.arch }}
+        run: pnpm --filter @pi-desktop/desktop run ${{ matrix.dist }} --${{ matrix.arch }}
+
+      - name: Package Windows x86 installer with its i686 host
+        if: matrix.platform == 'windows' && matrix.arch == 'ia32'
+        run: |
+          pnpm --filter @pi-desktop/agent-runtime bundle
+          pnpm --filter @pi-desktop/desktop build
+          pnpm --filter @pi-desktop/desktop exec node ../../scripts/build-desktop-release.mjs win --ia32
 
       - name: Package unsigned macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
         env:
-          # Debug-only lane: workflow_dispatch with sign_macos=false.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           set -euo pipefail
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
-          pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }}
+          pnpm --filter @pi-desktop/desktop run dist:mac --${{ matrix.arch }}
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,
@@ -234,41 +298,11 @@ jobs:
         if: matrix.platform == 'macos'
         run: scripts/macos-signing-diagnostics.sh
 
-      - name: Require macOS signing and notarization secrets
-        if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          missing=()
-          [[ -n "${CSC_LINK}" ]] || missing+=(CSC_LINK)
-          [[ -n "${CSC_KEY_PASSWORD}" ]] || missing+=(CSC_KEY_PASSWORD)
-          [[ -n "${APPLE_ID}" ]] || missing+=(APPLE_ID)
-          [[ -n "${APPLE_APP_SPECIFIC_PASSWORD}" ]] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
-          [[ -n "${APPLE_TEAM_ID}" ]] || missing+=(APPLE_TEAM_ID)
-          if ((${#missing[@]} > 0)); then
-            echo "::error::Missing GitHub Actions secrets for macOS signing/notarization: ${missing[*]}"
-            echo "::error::Add them under Settings → Secrets and variables → Actions. See docs/spec/06-delivery/06-release-runbook.md."
-            exit 1
-          fi
-          if [[ "${APPLE_TEAM_ID}" != "DUV63RKYTW" ]]; then
-            echo "::error::APPLE_TEAM_ID must be DUV63RKYTW (XingYu Liu Developer ID team)."
-            exit 1
-          fi
-
       - name: Package signed and notarized macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # electron-builder rejects the "Developer ID Application:" prefix on
-          # identity names and resolves the certificate itself, so CSC_NAME
-          # carries the bare common name only.
-          CSC_NAME: "XingYu Liu (DUV63RKYTW)"
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -302,7 +336,8 @@ jobs:
           # PI_SIGNING_TIMEOUT_SECONDS instead of waiting for the job timeout.
           node scripts/macos-signing-watchdog.mjs \
             --label "dist:mac-${{ matrix.arch }}" \
-            -- pnpm --filter @pi-desktop/desktop run dist:mac -- --${{ matrix.arch }} \
+            -- pnpm --filter @pi-desktop/desktop run dist:mac --${{ matrix.arch }} \
+              -c.extraMetadata.piMacUpdates=true \
               -c.mac.forceCodeSigning=true \
               -c.mac.notarize=true
 
@@ -335,7 +370,25 @@ jobs:
 
       - name: Verify signed and notarized macOS installer
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE == 'true'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: scripts/verify-macos-release.sh apps/desktop/release
+
+      - name: Verify Windows application and host architecture
+        if: matrix.platform == 'windows'
+        env:
+          WINDOWS_ARCH: ${{ matrix.arch }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const ia32 = process.env.WINDOWS_ARCH === 'ia32';
+          const root = `apps/desktop/release/win${ia32 ? '-ia32' : ''}-unpacked`;
+          for (const path of ['PI-Desktop.exe', 'resources/bin/pi-desktop-host-core.exe']) {
+            const executable = readFileSync(`${root}/${path}`);
+            const machine = executable.readUInt16LE(executable.readUInt32LE(0x3c) + 4);
+            if (machine !== (ia32 ? 0x14c : 0x8664)) throw new Error(`${path} has the wrong PE architecture`);
+          }
+          NODE
 
       - name: Verify Linux host-core glibc floor
         if: matrix.platform == 'linux'
@@ -515,7 +568,7 @@ jobs:
   publish:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, pi-host-bundle]
+    needs: [configuration, build, pi-host-bundle]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -531,6 +584,8 @@ jobs:
 
       - name: Merge macOS updater metadata
         working-directory: dist
+        env:
+          MACOS_SIGN_RELEASE: ${{ needs.configuration.outputs.macos_signed }}
         run: |
           set -euo pipefail
           ruby <<'RUBY'
@@ -546,10 +601,17 @@ jobs:
           versions = feeds.map { |feed| feed.fetch("version") }.uniq
           abort "macOS updater feeds disagree on version" unless versions.length == 1
 
-          files = feeds.flat_map { |feed| feed.fetch("files") }
-            .uniq { |file| file.fetch("url") }
-          zip = files.find { |file| file.fetch("url").end_with?(".zip") }
-          abort "macOS updater feeds contain no ZIP" if zip.nil?
+          require "digest"
+          require "base64"
+          files = feeds.zip(["arm64", "x64"]).map do |feed, arch|
+            zip = feed.fetch("files").find { |file| file.fetch("url").end_with?("-#{arch}-mac.zip") }
+            abort "Missing updater ZIP for #{arch}" if zip.nil?
+            path = zip.fetch("url")
+            digest = Base64.strict_encode64(Digest::SHA512.file(path).digest)
+            abort "Incorrect checksum for #{path}" unless digest == zip.fetch("sha512")
+            zip
+          end
+          zip = files.first
 
           merged = feeds.first.merge(
             "version" => versions.first,
@@ -557,7 +619,8 @@ jobs:
             "path" => zip.fetch("url"),
             "sha512" => zip.fetch("sha512"),
           )
-          File.write("latest-mac.yml", merged.to_yaml)
+          File.write("manual-mac.yml", merged.to_yaml)
+          File.write("latest-mac.yml", merged.to_yaml) if ENV["MACOS_SIGN_RELEASE"] == "true"
           RUBY
           rm latest-mac-arm64.yml latest-mac-x64.yml
 
@@ -567,9 +630,9 @@ jobs:
           # D126/D285/D364/D603: all desktop platforms and both native macOS
           # architectures ship from tag builds — installers, the Windows
           # portable ZIP, the Linux ASAR, blockmaps, and the latest*.yml
-          # feeds that drive electron-updater on each platform (in-app for
-          # Windows NSIS and Linux AppImage; macOS and Windows ZIP remain
-          # manual-delivery by product policy).
+          # feeds for Windows NSIS, signed macOS and Linux AppImage.
           files: dist/*
           generate_release_notes: true
+          body: ${{ needs.configuration.outputs.macos_signed == 'true' && 'macOS installers are Developer ID signed and notarized.' || 'macOS installers are for manual installation. Developer ID signing is required for in-app installation.' }}
+          fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}

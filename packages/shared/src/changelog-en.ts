@@ -3,8 +3,9 @@ import type { ChangelogEntry } from "./changelog.js";
 export const enEntries: ChangelogEntry[] = [
   {
     version: "0.24.0",
-    date: "2026-11-20",
+    date: "2026-11-24",
     highlights: [
+      "Connect an iAgent account for synchronized chat models, group prices and thinking levels, and use the website's asynchronous image generation in Agent mode.",
       "On a fresh install, session titles are generated automatically by the bundled Official enhancements plugin; suggestions, draft enhancement and AI memory stay off until you turn them on.",
       "New task now starts a temporary chat outside any project, and conversations can move between projects or back to Temporary chat.",
       "On the empty home, click the project name or \"temporarily\" in the title to switch projects; the project-free destination is now called Temporary chat everywhere.",

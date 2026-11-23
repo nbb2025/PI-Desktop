@@ -14,13 +14,12 @@ const notarizeScript = new URL(
   import.meta.url,
 );
 
-const SIGNING_IDENTITY = "Developer ID Application: XingYu Liu (DUV63RKYTW)";
-const SIGNING_IDENTITY_NAME = "XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY = "Developer ID Application: Fixture Publisher (ABCDE12345)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
 const NOTARY_ENV = {
   APPLE_ID: "release@example.com",
   APPLE_APP_SPECIFIC_PASSWORD: "app-specific-password",
-  APPLE_TEAM_ID: "DUV63RKYTW",
+  APPLE_TEAM_ID: "ABCDE12345",
 };
 
 async function writeSignedAppFixture(release) {
@@ -266,7 +265,7 @@ test("the notarization step fails closed without team-scoped credentials", async
     APPLE_TEAM_ID: "WRONGTEAMID",
   });
   assert.equal(wrongTeam.status, 1);
-  assert.match(wrongTeam.stderr, /APPLE_TEAM_ID must be DUV63RKYTW/);
+  assert.match(wrongTeam.stderr, /Invalid APPLE_TEAM_ID/);
 
   assert.equal(
     await readFile(log, "utf8").catch(() => ""),
@@ -286,7 +285,7 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\nexit 0\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=ABCDE12345' >&2; echo 'flags=0x10000(runtime)' >&2; fi\nexit 0\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -300,13 +299,11 @@ test("macOS release verification requires a notarized Developer ID app and DMG",
     ["codesign", "spctl", "xcrun"].map((name) => chmod(join(bin, name), 0o755)),
   );
 
-  // The local lane passes the bare common name; the script must still match the
-  // prefixed Authority line codesign prints.
   const result = spawnSync("bash", [verifyScript.pathname, release], {
     encoding: "utf8",
     env: {
       ...process.env,
-      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      APPLE_TEAM_ID: "ABCDE12345",
       PATH: `${bin}:${process.env.PATH}`,
       STAPLER_LOG: staplerLog,
       STAPLE_ATTEMPTS: "2",
@@ -334,7 +331,7 @@ test("macOS release verification rejects a Developer ID app without notarization
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; fi\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=ABCDE12345' >&2; fi\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -347,14 +344,14 @@ test("macOS release verification rejects a Developer ID app without notarization
 
   const result = spawnSync("bash", [verifyScript.pathname, release], {
     encoding: "utf8",
-    env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+    env: { ...process.env, APPLE_TEAM_ID: "ABCDE12345", PATH: `${bin}:${process.env.PATH}` },
   });
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /did not recognize .* as notarized/);
 });
 
-test("macOS release verification accepts the prefixed identity form", async (t) => {
+test("macOS verification matches the recorded Apple team", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-prefixed-"));
   t.after(() => rm(root, { recursive: true, force: true }));
 
@@ -364,7 +361,7 @@ test("macOS release verification accepts the prefixed identity form", async (t) 
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'flags=0x10000(runtime)' >&2; fi\n`,
+    `#!/usr/bin/env bash\nif [[ "$*" == *"-dv"* ]]; then echo 'Authority=${SIGNING_IDENTITY}' >&2; echo 'TeamIdentifier=ABCDE12345' >&2; echo 'flags=0x10000(runtime)' >&2; fi\n`,
   );
   await writeFile(
     join(bin, "spctl"),
@@ -379,7 +376,7 @@ test("macOS release verification accepts the prefixed identity form", async (t) 
     encoding: "utf8",
     env: {
       ...process.env,
-      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY,
+      APPLE_TEAM_ID: "ABCDE12345",
       PATH: `${bin}:${process.env.PATH}`,
     },
   });
@@ -397,7 +394,7 @@ test("macOS release verification rejects a different signing identity", async (t
   await mkdir(bin, { recursive: true });
   await writeFile(
     join(bin, "codesign"),
-    "#!/usr/bin/env bash\nif [[ \"$*\" == *\"-dv\"* ]]; then echo 'Authority=Developer ID Application: Someone Else (ZZZZZZZZZZ)' >&2; fi\n",
+    "#!/usr/bin/env bash\nif [[ \"$*\" == *\"-dv\"* ]]; then echo 'Authority=Developer ID Application: Someone Else (ZZZZZZZZZZ)' >&2; echo 'TeamIdentifier=ZZZZZZZZZZ' >&2; fi\n",
   );
   await writeFile(
     join(bin, "spctl"),
@@ -412,11 +409,11 @@ test("macOS release verification rejects a different signing identity", async (t
     encoding: "utf8",
     env: {
       ...process.env,
-      MAC_SIGNING_IDENTITY: SIGNING_IDENTITY_NAME,
+      APPLE_TEAM_ID: "ABCDE12345",
       PATH: `${bin}:${process.env.PATH}`,
     },
   });
 
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /is not signed with/);
+  assert.match(result.stderr, /is not signed by the configured Developer ID team/);
 });

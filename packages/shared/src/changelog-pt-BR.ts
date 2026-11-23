@@ -3,8 +3,9 @@ import type { ChangelogEntry } from "./changelog.js";
 export const ptBREntries: ChangelogEntry[] = [
   {
     version: "0.24.0",
-    date: "2026-11-20",
+    date: "2026-11-24",
     highlights: [
+      "Conecte sua conta iAgent para sincronizar modelos, preços por grupo e níveis de raciocínio e gerar imagens de forma assíncrona.",
       "Em uma instalação nova, o plugin incluído Melhorias oficiais gera automaticamente os títulos das sessões; sugestões, aprimoramento de rascunho e memória de IA continuam desligados até você ativá-los.",
       "Nova tarefa agora inicia um chat temporário fora de qualquer projeto, e as conversas podem ser movidas entre projetos ou de volta para Chat temporário.",
       "Na tela inicial vazia, clique no nome do projeto ou em \"temporariamente\" no título para trocar de projeto; o destino sem projeto agora se chama Chat temporário em todo lugar.",

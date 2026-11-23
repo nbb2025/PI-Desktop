@@ -2,6 +2,16 @@ import type { UpdateMode, UpdatePreference } from "@pi-desktop/shared";
 
 export type WindowsDistribution = "installed" | "zip" | "portable";
 
+export function releaseUpdateChannel(
+  platform: NodeJS.Platform,
+  arch: string,
+  macUpdatesCapable: boolean,
+): string | undefined {
+  if (platform === "win32" && arch === "ia32") return "latest-ia32";
+  if (platform === "darwin" && !macUpdatesCapable) return "manual";
+  return undefined;
+}
+
 export function supportsAutomaticUpdates(
   platform: NodeJS.Platform,
   isPackaged: boolean,
