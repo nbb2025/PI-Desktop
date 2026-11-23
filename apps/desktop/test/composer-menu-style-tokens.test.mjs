@@ -26,12 +26,12 @@ test("composer model chip uses the existing single-line height token", () => {
   assert.equal(declaration(rule(tokens, "@theme"), "--leading-none"), "1");
 });
 
-test("light model menu token preserves its opaque surface and original shadow", () => {
-  const menu = rule(menus, ':root[data-theme="light"] .composer-model-menu');
+test("the model menu has an opaque surface and retains the light theme shadow", () => {
+  const menu = rule(menus, ".composer-model-menu");
+  const lightMenu = rule(menus, ':root[data-theme="light"] .composer-model-menu');
   assert.equal(declaration(menu, "background"), "var(--ds-bg-elevated-opaque)");
-  assert.equal(declaration(menu, "backdrop-filter"), "none");
-  assert.equal(declaration(menu, "-webkit-backdrop-filter"), "none");
-  assert.equal(declaration(menu, "box-shadow"), "var(--ds-shadow-model-menu)");
+  assert.doesNotMatch(`${menu}\n${lightMenu}`, /backdrop-filter:/);
+  assert.equal(declaration(lightMenu, "box-shadow"), "var(--ds-shadow-model-menu)");
   assert.equal(
     declaration(rule(tokens, ':root[data-theme="light"]'), "--ds-shadow-model-menu"),
     "0 0 0 0.5px color-mix(in oklab, #1a1c1f 10%, transparent), " +
