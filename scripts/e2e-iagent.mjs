@@ -263,7 +263,16 @@ try {
   assert.deepEqual(posts, []);
   await evaluate('window.__PI_DESKTOP__.setPage("chat")');
   await waitFor(() => evaluate(`!!document.querySelector('.composer-input[contenteditable="true"]')`), 15_000, "agent composer");
-  await waitFor(() => evaluate('document.querySelector(".empty-hero .brand-logo")?.src.includes("iagent-mark")'), 10_000, "official iAgent mark");
+  await waitFor(() => evaluate(`(async () => {
+    const element = document.querySelector(".empty-hero .brand-logo");
+    if (!element) return false;
+    const background = getComputedStyle(element).backgroundImage;
+    if (!background.startsWith('url("') || !background.includes("iagent-mark")) return false;
+    const image = new Image();
+    image.src = background.slice(5, -2);
+    await image.decode();
+    return image.naturalWidth > 0;
+  })()`), 10_000, "official iAgent mark");
   const openMenu = () => evaluate('document.querySelector(".composer-model-thinking-chip").click()');
   const closeMenu = () => send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
   const selectGroup = (label) => evaluate(`Array.from(document.querySelectorAll(".composer-model-rail-item"))

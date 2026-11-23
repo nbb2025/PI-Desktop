@@ -1,15 +1,9 @@
-import brandLogoUrl from "../assets/brand/iagent-mark.png";
-
 export function BrandLogo({ size = 16 }: { size?: number }) {
   return (
-    <img
+    <span
       className="brand-logo"
-      src={brandLogoUrl}
-      alt=""
       aria-hidden="true"
-      width={size}
-      height={size}
-      draggable={false}
+      style={{ width: size, height: size }}
     />
   );
 }
