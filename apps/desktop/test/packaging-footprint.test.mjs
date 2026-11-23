@@ -64,14 +64,15 @@ test("renderer output keeps its size controls", async () => {
   assert.match(viteConfigSource, /dropLegacyFontFallbacks/);
   assert.match(viteConfigSource, /plugins:\s*\[[^\]]*dropLegacyFontFallbacks\(\)/);
 
-  // build/*.png are electron-builder installer icons (1024px+). The renderer
-  // must import the downscaled marks instead.
-  const brandLogoSource = await readFile(
-    new URL("../src/components/BrandLogo.tsx", import.meta.url),
+  // The renderer's decorative mark uses the renderer-sized asset.
+  const chromeStyles = await readFile(
+    new URL("../src/styles/chrome.css", import.meta.url),
     "utf8",
   );
-  assert.match(brandLogoSource, /"\.\.\/assets\/brand\/iagent-mark\.png"/);
-  assert.doesNotMatch(brandLogoSource, /\.\.\/\.\.\/build\//);
+  const brandStyle = chromeStyles.match(/\.brand-logo\s*\{([^}]*)\}/)?.[1];
+  assert.ok(brandStyle);
+  assert.match(brandStyle, /url\("\.\.\/assets\/brand\/iagent-mark\.png"\)/);
+  assert.doesNotMatch(brandStyle, /\.\.\/\.\.\/build\//);
 });
 
 test("legacy font fallback stripping only removes redundant fallback sources", () => {

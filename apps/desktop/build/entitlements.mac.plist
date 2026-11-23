@@ -8,8 +8,8 @@
     <!-- V8 on Apple Silicon also needs unsigned executable memory. -->
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
-    <!-- Electron helpers and plugin-loaded native addons are not all signed by
-         Team DUV63RKYTW; library validation would refuse them. -->
+    <!-- Electron helpers and plugin-loaded native addons can be signed by
+         different publishers, so they need library validation disabled. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
     <!-- Isolated plugin panels may capture microphone after the user grants

@@ -238,8 +238,8 @@ test("release matrix packages both native macOS architectures", () => {
   );
   assert.match(
     releaseWorkflowSource,
-    /Package unsigned macOS installer[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac --\$\{\{ matrix\.arch \}\}/,
-    "unsigned macOS builds use the shared artifact naming config",
+    /Package macOS manual-install bundle[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac --\$\{\{ matrix\.arch \}\}/,
+    "manual-install macOS builds use the shared artifact naming config",
   );
   assert.doesNotMatch(
     releaseWorkflowSource,
@@ -269,14 +269,16 @@ test("macOS automatic updates require the signed release lane", () => {
     ),
   );
 
-  const unsignedBlock = releaseWorkflowSource.match(
-    /- name: Package unsigned macOS installer[\s\S]*?(?=\n      - name:)/,
+  const manualBlock = releaseWorkflowSource.match(
+    /- name: Package macOS manual-install bundle[\s\S]*?(?=\n      - name:)/,
   )?.[0];
-  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
-  assert.match(unsignedBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
-  assert.match(unsignedBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
-  assert.doesNotMatch(unsignedBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
-  assert.doesNotMatch(unsignedBlock, /forceCodeSigning|notarize/);
+  assert.ok(manualBlock, "macOS manual-install package step is missing");
+  assert.match(manualBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
+  assert.match(manualBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
+  assert.match(manualBlock, /-c\.mac\.identity=-/);
+  assert.match(manualBlock, /codesign --verify --deep --strict/);
+  assert.doesNotMatch(manualBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
+  assert.doesNotMatch(manualBlock, /forceCodeSigning|notarize/);
 
   assert.match(releaseWorkflowSource, /Incomplete macOS signing configuration/);
   assert.match(releaseWorkflowSource, /File.write\("manual-mac\.yml", merged\.to_yaml\)/);
@@ -438,11 +440,9 @@ test("macOS signing instrumentation stays out of the Windows and Linux lanes", (
   assert.doesNotMatch(stepBlock("Package installers"), instrumentation);
   assert.doesNotMatch(stepBlock("Verify Linux host-core glibc floor"), instrumentation);
   assert.doesNotMatch(stepBlock("Export Linux ASAR release asset"), instrumentation);
-  // The unsigned macOS debug lane reports its bundle size but must not gain a
-  // signing identity, notarization, or publishing behaviour.
-  const unsignedBlock = stepBlock("Package unsigned macOS installer");
-  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
-  assert.doesNotMatch(unsignedBlock, instrumentation);
+  const manualBlock = stepBlock("Package macOS manual-install bundle");
+  assert.ok(manualBlock, "macOS manual-install package step is missing");
+  assert.doesNotMatch(manualBlock, instrumentation);
 });
 
 test("the iAgent release stays in its GitHub repository", async () => {

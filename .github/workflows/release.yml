@@ -13,7 +13,8 @@
 # exported as a system-Electron repackaging asset, and all outputs — with their
 # electron-updater latest*.yml feeds — are published to the GitHub Release
 # (D126/D285/D364/D603). macOS auto-update feeds require Developer ID signing,
-# notarization and stapling. Without credentials, macOS publishes the manual feed.
+# notarization and stapling. Without credentials, macOS publishes ad-hoc signed
+# bundles and the manual feed.
 #
 # It also builds the headless `pi-host` bundle for both Linux architectures the
 # desktop publishes and publishes each as
@@ -30,7 +31,7 @@ on:
   workflow_dispatch:
     inputs:
       sign_macos:
-        description: 'Sign and notarize macOS artifacts (default true; set false only for unsigned debug artifacts)'
+        description: 'Sign with Developer ID and notarize macOS artifacts (set false for manual-install artifacts)'
         required: false
         default: true
         type: boolean
@@ -280,7 +281,7 @@ jobs:
           pnpm --filter @pi-desktop/desktop build
           pnpm --filter @pi-desktop/desktop exec node ../../scripts/build-desktop-release.mjs win --ia32
 
-      - name: Package unsigned macOS installer
+      - name: Package macOS manual-install bundle
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -288,7 +289,14 @@ jobs:
           set -euo pipefail
           # Artifact names are defined in apps/desktop/package.json: the mac
           # pattern labels ZIPs, and the dmg target pattern labels DMGs.
-          pnpm --filter @pi-desktop/desktop run dist:mac --${{ matrix.arch }}
+          pnpm --filter @pi-desktop/desktop run dist:mac --${{ matrix.arch }} -c.mac.identity=-
+          shopt -s nullglob
+          bundles=(apps/desktop/release/mac*/PI-Desktop.app)
+          if ((${#bundles[@]} != 1)); then
+            echo "::error::Expected exactly one macOS application bundle."
+            exit 1
+          fi
+          codesign --verify --deep --strict "${bundles[0]}"
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,

@@ -244,27 +244,25 @@
   `development-branding.test.mjs`, `ci-workflow.test.mjs`); Fedora KDE/Wayland
   installation remains runner validation
 
-## E2E-196a: Unsigned macOS debug lane
+## E2E-196a: macOS manual-install lane
 
-- **Preconditions**: The Release workflow is manually dispatched with
-  `sign_macos: false`; Windows and Linux release credentials are not affected.
-  This path must not be used to publish a GitHub Release tag.
+- **Preconditions**: The Release workflow is dispatched with `sign_macos: false`
+  or a matching tag is pushed with all Apple signing inputs absent.
 - **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
-  Confirm both macOS architectures complete ordinary DMG/ZIP packaging without
-  certificate secrets. 3) Inspect the artifacts and workflow steps.
-- **Expected**: macOS DMG/ZIP artifacts are produced and uploaded without
-  Developer ID signatures or notarization, using explicit `-arm64` and `-x64`
-  filename markers for their native architecture; macOS staple and Gatekeeper
-  checks are explicitly skipped. Windows/Linux artifacts and the merged updater
-  feed still publish normally. This exception does not satisfy E2E-196c.
+  Confirm both macOS architectures produce DMG and ZIP packages with matching
+  native host binaries. 3) Verify the ad-hoc signatures and inspect the tag
+  release's `manual-mac.yml` when testing a tag.
+- **Expected**: Both bundles pass `codesign --verify --deep --strict`. Filenames
+  identify their native architectures. Tag runs publish the manual updater
+  feed with both ZIP checksums. Manual dispatches retain Actions artifacts.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (debug packaging)
+- **Acceptance**: Quality (manual installation)
 - **Milestone**: M6+
-- **Status**: Opt-in debug lane; tag releases must satisfy E2E-196c.
+- **Status**: Release workflow verifies macOS bundle integrity in both lanes.
 
 ## E2E-196b: macOS packages omit first-launch helper assets
 
-- **Preconditions**: An unsigned macOS debug packaging run has produced DMG and
+- **Preconditions**: A macOS manual-install packaging run has produced DMG and
   ZIP artifacts for at least one native architecture.
 - **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
   the only items in its window. 2) Inspect the ZIP root without extracting the
@@ -273,8 +271,7 @@
   installable from the ZIP.
 - **Expected**: The DMG contains the branded 720×440 background, the app, and
   the Applications link only. The ZIP contains the app but neither first-launch
-  guidance asset. The same omission applies to signed and unsigned macOS
-  artifacts; signing, notarization, and updater behavior are unchanged.
+  guidance asset. The same package layout applies to both macOS release lanes.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
   `05-security/01-security.md`
 - **Acceptance**: Quality, Security
@@ -282,7 +279,7 @@
 - **Status**: Automated by `packaging-footprint.test.mjs`; native archive
   inspection remains release-runner validation
 
-## E2E-196c: macOS tag artifacts pass Gatekeeper without a quarantine bypass
+## E2E-196c: Developer ID artifacts pass Gatekeeper
 
 - **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
   pushed, or the Release workflow is dispatched with `sign_macos: true`
@@ -307,7 +304,7 @@
   tickets. The DMG has its own submission: a DMG that was never submitted has
   no ticket and fails `stapler staple` with error 65, so a tag build must never
   reach that state. The app opens normally; no `xattr` quarantine-removal
-  command or Security & Privacy override is required. Missing secrets, a
+  command or Security & Privacy override is required. Incomplete secrets, a
   rejected submission, or exhausted staple or validation retries fail the job.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
   `05-security/01-security.md`, ADR 0289
@@ -316,26 +313,10 @@
 - **Status**: Workflow script/unit-covered; clean-machine journey required for
   each release (run only in a capable environment when this surface changes)
 
-## E2E-212: GitHub Release starts the CNB mirror pipeline
+## E2E-212: Retired release mirroring
 
-- **Preconditions**: Repository secret `CNB_MIRROR_TOKEN` is configured on
-  `vastsa/PI-Desktop`; the CNB pipeline at `aixk/Pi-Desktop` listens for
-  `api_trigger_mirror`; a GitHub Release tag such as `vX.Y.Z` exists with
-  uploaded artifacts.
-- **Steps**: 1) Publish or edit that GitHub Release, or dispatch
-  `mirror-to-cnb.yml` with the same tag. 2) Inspect the Actions log for the
-  resolved tag and the POST to `api.cnb.cool`. 3) Confirm the CNB pipeline
-  starts with `MIRROR_TAGS` equal to that tag.
-- **Expected**: The job runs only on `vastsa/PI-Desktop`. Manual dispatch
-  without a `vX.Y.Z` tag fails before calling CNB. A missing
-  `CNB_MIRROR_TOKEN` fails closed. The JSON body is built with `jq` (not
-  YAML string interpolation). GitHub Release artifacts and updater feeds are
-  unchanged; CNB is a mirror of the same tag.
-- **Specs linked**: `06-delivery/06-release-runbook.md`
-- **Acceptance**: Quality (release mirroring)
-- **Milestone**: M6+
-- **Status**: Source-contract covered (`ci-workflow.test.mjs`); live CNB
-  start remains operator validation (run only in a capable environment when this surface changes)
+The release workflow uses `nbb2025/PI-Desktop`. See E2E-IAGENT-release-feed
+for the active release and updater check.
 
 ## Boot & Healthcheck
 
@@ -1355,7 +1336,7 @@ Use synthetic Darwin x64/arm64 uname responses through production SSH bootstrap,
 - Build a matching tag on the fork and verify the Windows ia32/x64 and
   macOS Intel/Apple Silicon assets belong to that tag.
 - An installed Windows app discovers only its architecture's NSIS update.
-  An unsigned macOS build discovers the manual feed and links to the GitHub
+  A macOS manual-install build discovers the manual feed and links to the GitHub
   Release. A Developer ID-signed build uses the signed ZIP feed and can
   install the update after restart.
 - Controller coverage runs with the updater and packaging boundaries

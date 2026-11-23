@@ -14,11 +14,10 @@
 | Local DMG | `pnpm --filter @pi-desktop/desktop dist` | unsigned without a configured certificate | local install test |
 | Release | `scripts/release-macos.sh` | Developer ID + mandatory notarization | distributable artifact |
 
-The static electron-builder config does not embed a certificate identity, so
-contributors without certificates can still package locally. The release lane
-requires an injected Developer ID identity (local) or `CSC_LINK` certificate
-(CI), and fails before publication if signing or notarization verification does
-not pass.
+The static electron-builder config lets contributors package locally without
+a certificate. The Developer ID lane requires an injected identity (local) or
+a `CSC_LINK` certificate (CI). Publication requires successful signature and
+notarization verification for that lane.
 
 On macOS, `pnpm dev` creates and reuses a fingerprinted branded Electron host
 bundle under `.cache/electron-dev/`. Its bundle name, executable, identifier,
@@ -37,7 +36,8 @@ The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
 (the package no longer installs it during `pnpm install`).
 Packaged lanes use `build/icon.icns` through electron-builder on macOS and
 `build/icon.ico` for the Windows executable and native window icon. The
-renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
+renderer displays the iAgent mark through `BrandLogo` and its stylesheet.
+The source PNG is canonical, and
 `scripts/make-icon.py` derives the multi-size Windows ICO, the 512px
 Windows/Linux package PNG, the
 transparent monochrome `build/tray-icon-mac.png` template, and the iconset/ICNS
@@ -217,8 +217,9 @@ macOS uses native arm64 and Intel x64 runners, with a matching Rust host core.
 The workflow selects Developer ID signing when all five repository secrets
 are available and rejects incomplete configurations. A tag with no signing
 credentials can publish manual-install DMG/ZIP assets and `manual-mac.yml`.
-Those bundles use in-app discovery and link to the download page. Signed
-release bundles carry the in-app installation flag and publish
+That lane seals the application bundle with an ad-hoc signature and verifies
+its integrity before upload. It uses in-app discovery and links to the download
+page. Developer ID release bundles carry the in-app installation flag and publish
 `latest-mac.yml` in addition to the manual feed. Downloadable ZIPs in the
 merged feeds are hashed and kept architecture-specific.
 
@@ -243,7 +244,7 @@ level. Both public architectures are therefore explicit: the arm64 lane
 publishes `PI-Desktop-<version>-arm64.dmg` and
 `PI-Desktop-<version>-arm64-mac.zip`, while the Intel x64 lane publishes
 `PI-Desktop-<version>-x64.dmg` and `PI-Desktop-<version>-x64-mac.zip`. This
-applies to both unsigned and signed macOS lanes, including local release builds,
+applies to both macOS release lanes, including local release builds,
 and ensures each generated updater feed references its architecture-labelled
 asset names and matching checksums. Before upload, each macOS runner requires
 exactly one architecture-labelled DMG and ZIP (including blockmaps) and rejects
@@ -254,8 +255,8 @@ gesture. The app and Applications link are the only items in the window.
 
 The macOS ZIP contains `PI-Desktop.app` at its root. Neither the DMG nor ZIP
 ships an opening-help note or executable first-launch helper, including local
-and manual-install builds. Signed artifacts pass the same notarization gate; the
-unsigned lane is for debugging and does not imply Gatekeeper qualification.
+and manual-install builds. Apple Gatekeeper qualification requires Developer ID
+signing and notarization.
 
 DMG, ZIP, NSIS, AppImage, deb, rpm, blockmap, and updater feed outputs are already
 compressed or compression-insensitive. The workflow therefore uploads their
