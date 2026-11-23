@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { access, mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -256,6 +259,37 @@ test("release matrix packages both native macOS architectures", () => {
     /latest-mac-\$\{\{ matrix\.arch \}\}\.yml/,
   );
   assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
+});
+
+test("release input preparation works with Bash for native and i686 builds", {
+  skip: process.platform === "win32" ? "requires /bin/bash" : false,
+}, async (context) => {
+  const script = releaseWorkflowSource.match(
+    /- name: Prepare package inputs[\s\S]*?run: \|\n([\s\S]*?)\n      - name:/,
+  )?.[1];
+  assert.ok(script);
+  const cwd = await mkdtemp(join(tmpdir(), "pi-release-inputs-"));
+  context.after(() => rm(cwd, { recursive: true, force: true }));
+  const commands = `
+    cargo() {
+      printf '%s\\n' "$*"
+      if [[ -n "$RUST_TARGET" ]]; then
+        mkdir -p "target/$RUST_TARGET/release"
+        printf 'fixture' > "target/$RUST_TARGET/release/pi-desktop-host-core.exe"
+      fi
+    }
+    pnpm() { return 0; }
+  `;
+  for (const target of ["", "i686-pc-windows-msvc"]) {
+    const args = target ? ` --target ${target}` : "";
+    const calls = execFileSync("/bin/bash", ["-c", `${commands}\n${script}`], {
+      cwd,
+      env: { ...process.env, RUST_TARGET: target },
+      encoding: "utf8",
+    });
+    assert.equal(calls.trim(), `build --release --locked -p host-core${args}`);
+  }
+  assert.equal(await readFile(join(cwd, "target/release/pi-desktop-host-core.exe"), "utf8"), "fixture");
 });
 
 test("macOS automatic updates require the signed release lane", () => {
