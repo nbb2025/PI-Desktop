@@ -1,13 +1,17 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.24.0-beta.1",
+  "version": "0.24.0",
   "desktopName": "pi-desktop.desktop",
   "private": true,
   "description": "PI-Desktop Electron application",
-  "homepage": "https://github.com/vastsa/PI-Desktop",
+  "homepage": "https://ai.iagent.dev",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nbb2025/PI-Desktop.git"
+  },
   "author": {
-    "name": "vastsa",
-    "email": "hhxk666@gmail.com"
+    "name": "iAgent",
+    "email": "43722192+nbb2025@users.noreply.github.com"
   },
   "main": "./out/main/index.js",
   "type": "module",
@@ -90,12 +94,13 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "vastsa",
+        "owner": "nbb2025",
         "repo": "PI-Desktop"
       }
     ],
     "extraMetadata": {
-      "piDistribution": "installed"
+      "piDistribution": "installed",
+      "piMacUpdates": false
     },
     "files": [
       "out/**/*",

@@ -11,6 +11,7 @@ import {
 } from "../../../lib/composer-models";
 import { providerDisplayName } from "../../../lib/provider-display";
 import type { ComposerModelSection } from "./hooks/useComposerModelMenu";
+import { IagentModelPrice } from "./IagentModelPrice";
 
 export type ComposerModelGroup = {
   provider: ProviderPublic;
@@ -32,58 +33,63 @@ type ModelRowProps = {
 
 function ModelRow({ t, provider, model, index, highlighted, active, showProvider, selectModel }: ModelRowProps) {
   const optionTitle = model.modelId;
+  const managed = provider.managedBy === "iagent";
   const alias = composerModelBinding(provider, model.modelId)?.alias?.trim();
   const optionDisplayName = composerModelDisplayName(provider, model.modelId);
   return (
     <button
       type="button"
       data-model-index={index}
+      data-iagent={managed ? "" : undefined}
       title={optionTitle}
       className={`composer-plus-item composer-model-option ${active ? "active" : ""} ${highlighted ? "kb-active" : ""}`}
       role="menuitemradio"
       aria-checked={active}
       onClick={() => void selectModel(provider, model.modelId)}
     >
-      <span className="composer-model-option-main">
-        {/*
-          One label per row, never both: the name the user set wins over the
-          catalog's, and an alias carries its own tone so which one is on
-          screen stays visible. The wire id remains the row's title.
-        */}
-        <span className={`composer-model-label ${alias ? "is-alias" : ""}`}>
-          {alias || optionDisplayName}
+      <span className="composer-model-option-content">
+        <span className="composer-model-option-main">
+          {/*
+            One label per row, never both: the name the user set wins over the
+            catalog's, and an alias carries its own tone so which one is on
+            screen stays visible. The wire id remains the row's title.
+          */}
+          <span className={`composer-model-label ${alias ? "is-alias" : ""}`}>
+            {alias || optionDisplayName}
+          </span>
+          <span className="composer-model-option-meta">
+            {showProvider ? (
+              <span className="composer-model-option-provider">{providerDisplayName(provider)}</span>
+            ) : (
+              <>
+                {composerModelBadges(model, provider).map((badge) => {
+                  const badgeLabel = t(
+                    badge === "reasoning" ? "chat.modelBadgeReasoning" : "chat.modelBadgeVision",
+                  );
+                  return (
+                    <span
+                      key={badge}
+                      className="composer-model-option-badge"
+                      title={badgeLabel}
+                      aria-label={badgeLabel}
+                      role="img"
+                    >
+                      {badge === "reasoning" ? (
+                        <IconSparkles size={12} aria-hidden="true" />
+                      ) : (
+                        <IconEye size={12} aria-hidden="true" />
+                      )}
+                    </span>
+                  );
+                })}
+                {model.contextWindow ? (
+                  <span className="composer-model-option-ctx">{formatTokenCount(model.contextWindow)}</span>
+                ) : null}
+              </>
+            )}
+          </span>
         </span>
-        <span className="composer-model-option-meta">
-          {showProvider ? (
-            <span className="composer-model-option-provider">{providerDisplayName(provider)}</span>
-          ) : (
-            <>
-              {composerModelBadges(model, provider).map((badge) => {
-                const badgeLabel = t(
-                  badge === "reasoning" ? "chat.modelBadgeReasoning" : "chat.modelBadgeVision",
-                );
-                return (
-                  <span
-                    key={badge}
-                    className="composer-model-option-badge"
-                    title={badgeLabel}
-                    aria-label={badgeLabel}
-                    role="img"
-                  >
-                    {badge === "reasoning" ? (
-                      <IconSparkles size={12} aria-hidden="true" />
-                    ) : (
-                      <IconEye size={12} aria-hidden="true" />
-                    )}
-                  </span>
-                );
-              })}
-              {model.contextWindow ? (
-                <span className="composer-model-option-ctx">{formatTokenCount(model.contextWindow)}</span>
-              ) : null}
-            </>
-          )}
-        </span>
+        {managed ? <IagentModelPrice t={t} price={model.iagentChatPrice} /> : null}
       </span>
       <span className="composer-model-check-slot" aria-hidden="true">
         {active ? <IconCheck size={13} className="composer-model-check" /> : null}
@@ -190,18 +196,25 @@ export function ComposerModelList({
           {sections.map((section) => {
             const label = section.kind === "recent" ? t("chat.recentModels") : section.label;
             const current = section.id === activeSection;
+            const rate = section.kind === "provider" ? section.provider.iagentRate : undefined;
+            const multiplier = rate === undefined ? undefined : t("chat.iagentGroupRate", {
+              rate: new Intl.NumberFormat(undefined, { maximumSignificantDigits: 6 }).format(rate),
+            });
             return (
               <button
                 key={section.id}
                 type="button"
                 role="menuitemradio"
                 aria-checked={current}
-                title={label}
+                title={multiplier ? `${label} · ${multiplier}` : label}
                 data-empty={searching && (section.kind === "recent" || section.count === 0) ? "true" : undefined}
                 className={`composer-model-rail-item ${current ? "active" : ""}`}
                 onClick={() => selectSection(section.id)}
               >
-                <span className="composer-model-rail-label">{label}</span>
+                <span className="composer-model-rail-description">
+                  <span className="composer-model-rail-label">{label}</span>
+                  {multiplier ? <span className="composer-iagent-rate">{multiplier}</span> : null}
+                </span>
                 {section.kind === "provider" ? (
                   <span className="composer-model-rail-count">{section.count}</span>
                 ) : null}

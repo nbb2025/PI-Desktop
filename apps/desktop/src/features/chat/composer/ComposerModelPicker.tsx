@@ -4,6 +4,7 @@ import { ComposerModelList } from "./ComposerModelList";
 import { AnchoredMenu } from "../../../components/settings/AnchoredMenu";
 import { IconBot, IconChevronDown, IconZap } from "../../../components/icons";
 import { TooltipButton } from "../../../components/ui";
+import { BrandLogo } from "../../../components/BrandLogo";
 import type { useComposerModelMenu } from "./hooks/useComposerModelMenu";
 import { ThinkingLevelSlider } from "./ThinkingLevelSlider";
 
@@ -65,13 +66,15 @@ export function ComposerModelPicker({
     onMenuKeyDown,
   } = controller;
   const fastSuffix = fastMode ? ` · ${t("chat.fastModeBadge")}` : "";
+  const hasIagent = sections.some((section) => section.kind === "provider" && section.provider.managedBy === "iagent");
+  const iagentSelected = selectedProviderId?.startsWith("iagent:");
 
   return (
     <AnchoredMenu
       className="composer-model-thinking"
       open={open}
       onClose={() => setOpen(false)}
-      menuClassName={`composer-model-menu composer-model-thinking-menu ${showSectionRail ? "has-rail" : ""}`}
+      menuClassName={`composer-model-menu composer-model-thinking-menu ${showSectionRail ? "has-rail" : ""}${hasIagent ? " has-iagent" : ""}`}
       label={`${t("chat.model")} ${t("chat.reasoningLevel")}`}
       role="menu"
       align="end"
@@ -97,8 +100,8 @@ export function ComposerModelPicker({
             setOpen((current) => !current);
           }}
         >
-          <span className="composer-model-thinking-icon" aria-hidden="true">
-            <IconBot size={14} />
+          <span className={`composer-model-thinking-icon${iagentSelected ? " is-iagent" : ""}`} aria-hidden="true">
+            {iagentSelected ? <BrandLogo size={16} /> : <IconBot size={14} />}
           </span>
           <span className="composer-model-thinking-model">{modelLabel}</span>
           {thinkingLevel !== "off" ? (

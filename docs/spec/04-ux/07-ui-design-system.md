@@ -123,11 +123,9 @@ Codex as a visual reference. The identity contract is deliberately small:
 - The sidebar shell name, settings copy, and composer placeholder use
   `PI-Desktop`; `Codex` is reserved for the external session-import source or
   historical design-reference text.
-- `build/icon_1024.png` is the canonical shell logo master; the renderer
-  imports the 192x192 marks derived from it under `src/assets/brand/`
-  (ADR 0125). `BrandLogo` imports those
-  through Vite so the renderer bundle, development Dock, and packaged
-  application all use the same visual asset.
+- `src/assets/brand/iagent-mark.png` is the iAgent website mark used by
+  `BrandLogo`. `scripts/make-icon.py` derives the development Dock icon and
+  packaged application icons from the same artwork.
 - On macOS, both development and packaged launches expose `PI-Desktop` as the
   native application-menu name. The native About panel uses the PI-Desktop
   name, version, and canonical icon; no stock Electron name or icon is visible.
@@ -138,17 +136,9 @@ Codex as a visual reference. The identity contract is deliberately small:
   and NSIS shortcut identity stay aligned so native notifications,
   notification settings, and taskbar groups identify the app as `PI-Desktop`
   rather than Electron.
-- The empty-home hero uses a 100px `HomeMascotLogo` GIF: an eight-frame waving
-  mascot compiled from the supplied light and dark action sets, with a short
-  idle hold on the first frame. CSS selects the pair from
-  `document.documentElement[data-theme]`; anything other than `light` uses the
-  dark artwork. Playback is native to the GIF. There is no random pose
-  selection, JavaScript timer, or hover-driven speed change. Reduced motion
-  swaps the GIF for the matching first-frame PNG without changing the 100px
-  slot.
-  `BrandLogo` remains 20px/18px in the expanded/collapsed sidebar and 64px in
-  the startup splash. Composer prompt rows do not render a leading brand icon
-  in either home or thread-docked mode.
+- `BrandLogo` is 100px in the empty-home hero, 20px/18px in the
+  expanded/collapsed sidebar and 64px in the startup splash. The chat model
+  control uses the mark for iAgent groups.
 - The empty-home hero keeps three session identities: project sessions retain
   the underlined project action, temporary sessions use dedicated temporary
   chat copy without a project or folder action, and no active session uses the

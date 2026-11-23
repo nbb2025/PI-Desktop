@@ -68,6 +68,7 @@ import { MainProcessState } from "./bootstrap/main-state";
 import { registerApplicationActivation } from "./bootstrap/app-activation";
 import { createHostRuntime } from "./runtime/host";
 import { createSidecarRuntime } from "./runtime/sidecar";
+import { installIagentRuntime } from "./iagent/lifecycle";
 import { createComputerCursorOverlay } from "./computer-use/cursor-overlay";
 import { createEventPersistence } from "./runtime/event-persistence";
 import { createPlanRuntime } from "./runtime/plans";
@@ -368,9 +369,18 @@ const {
   speech,
 } = pluginServices;
 
+const { iagent, managedProviders } = installIagentRuntime({
+  app,
+  getHost,
+  modelsDevCatalog,
+  onChange: (update) => sendToRenderer(IPC.event.iagentChanged, update),
+  onRefreshError: (area) => logger.app("provider", "warn", `iAgent ${area} refresh failed`),
+});
+
 const providerCatalogRuntime = createProviderCatalogRuntime({
   getHost,
   modelsDevCatalog,
+  managedProviders,
 });
 const {
   bindingForModel,
@@ -393,6 +403,7 @@ const createdSessionLaunchRuntime = createSessionLaunchRuntime({
   sessionProjects,
   dataDir,
   vendorOAuth,
+  iagent,
   modelsDevCatalog,
   getWorkspacePath: currentWorkspacePath,
   pluginActiveInProject,
@@ -824,6 +835,7 @@ const sidecarRuntime = createSidecarRuntime({
   dataDir,
   agentExtensions,
   vendorOAuth,
+  iagent,
   listRuntimeProviders,
   modelsDevCatalog,
   effectiveSubagentModelConfig,
@@ -1017,6 +1029,7 @@ function registerIpc() {
     resolveEffectiveCommandShell,
     modelsDevCatalog,
     vendorOAuth,
+    iagent,
     enrichProvider,
     listRuntimeProviders,
     enrichProviderList,

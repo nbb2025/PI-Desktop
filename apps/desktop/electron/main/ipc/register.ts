@@ -24,6 +24,8 @@ import { registerJevIpc } from "./jev-ipc";
 import { registerModesIpc } from "./modes-ipc";
 import type { ModeServices } from "../runtime/mode-services";
 import { registerProviderIpc } from "./provider-ipc";
+import { registerIagentIpc } from "../iagent/ipc";
+import type { IagentIntegration } from "../iagent/integration";
 import { registerScheduledIpc } from "./scheduled-ipc";
 import { registerSessionIpc } from "./session-ipc";
 import { registerSettingsIpc } from "./settings-ipc";
@@ -49,6 +51,7 @@ import type { createTraySessions } from "../tray-sessions";
 import type { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
 
 export type RegisterIpcDependencies = {
+  iagent?: IagentIntegration;
   isQuitting: () => boolean;
   ipcMain: IpcMain;
   getMainWindow: () => BrowserWindow | null;
@@ -277,6 +280,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     togglePluginLauncher,
     safeOpenExternal,
     updater,
+    hasManagedProvider: () => (dependencies.iagent?.providers().length ?? 0) > 0,
   });
   registerStorageIpc({ registrar, getMainWindow, restart: dependencies.restartForStorage });
   registerNotificationIpc({
@@ -337,6 +341,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     getHost,
     modelsDevCatalog,
     vendorOAuth,
+    iagent: dependencies.iagent,
     logger,
     enrichProvider,
     listRuntimeProviders,
@@ -344,6 +349,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     bindingForModel,
     onProviderInvalidated: (providerId) => liveCallService?.invalidateProvider(providerId),
   });
+  if (dependencies.iagent) registerIagentIpc(registrar, dependencies.iagent);
   registerJevIpc({ registrar, logger });
   registerModesIpc({ registrar, catalog: dependencies.modeServices.catalog, runs: dependencies.modeServices.runs });
   registerComputerIpc({ registrar, getHost, publishGrant: publishComputerGrant });

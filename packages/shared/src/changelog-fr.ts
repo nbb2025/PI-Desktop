@@ -3,8 +3,9 @@ import type { ChangelogEntry } from "./changelog.js";
 export const frEntries: ChangelogEntry[] = [
   {
     version: "0.24.0",
-    date: "2026-11-20",
+    date: "2026-11-24",
     highlights: [
+      "Connectez votre compte iAgent pour synchroniser les modèles, les tarifs de groupe et les niveaux de raisonnement, et générer des images de façon asynchrone.",
       "Sur une nouvelle installation, le plugin intégré Améliorations officielles génère automatiquement les titres de session ; les suggestions, l'amélioration des brouillons et la mémoire IA restent désactivées jusqu'à ce que vous les activiez.",
       "Nouvelle tâche ouvre désormais une discussion temporaire hors de tout projet, et les conversations peuvent passer d'un projet à l'autre ou revenir en Discussion temporaire.",
       "Sur l'accueil vide, cliquez sur le nom du projet ou sur « temporairement » dans le titre pour changer de projet ; la destination sans projet s'appelle désormais partout Discussion temporaire.",

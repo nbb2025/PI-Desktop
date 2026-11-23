@@ -333,10 +333,12 @@ test("model configuration keeps model defaults; AI owns app behavior defaults", 
 
 
 test("model configuration lists AI services and vendor accounts together", () => {
-  // One list (D625): nothing filters OAuth rows out, and no second section.
+  // OAuth and custom API providers share the editable list (D625).
   assert.doesNotMatch(providersSource, /authKind !== OAUTH_AUTH_KIND/);
   assert.doesNotMatch(providersSource, /VendorAccountsSection/);
-  assert.match(providersSource, /<ServiceList\s+providers=\{providers\}/);
+  assert.match(providersSource, /const editableProviders = providers\.filter\(\(provider\) => provider\.managedBy !== "iagent"\)/);
+  assert.match(providersSource, /<IagentAccountCard \/>/);
+  assert.match(providersSource, /<ServiceList\s+providers=\{editableProviders\}/);
   // Readiness (a key, an OAuth account, or a no-auth provider) now lives in the
   // shared helper, so the page must delegate to it instead of re-inlining the
   // rule next to a second copy that can drift from the picker.

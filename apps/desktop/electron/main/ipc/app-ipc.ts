@@ -8,6 +8,7 @@ import {
   ErrorCodes,
   IPC,
   PROTOCOL_VERSION,
+  type OnboardingState,
   assertFeedbackIssueUrl,
   buildBugReportUrl,
 } from "@pi-desktop/shared";
@@ -23,6 +24,7 @@ export type AppIpcDependencies = {
   togglePluginLauncher: () => Promise<void>;
   safeOpenExternal: (url: unknown) => Promise<void>;
   updater: AppUpdaterController;
+  hasManagedProvider?: () => boolean;
 };
 
 /** Register app, instruction, launcher and update channels. */
@@ -33,6 +35,7 @@ export function registerAppIpc({
   togglePluginLauncher,
   safeOpenExternal,
   updater,
+  hasManagedProvider,
 }: AppIpcDependencies): void {
   const { handle, handleWithEvent } = registrar;
 
@@ -97,7 +100,12 @@ export function registerAppIpc({
   handle(IPC.invoke.appGetOnboarding, async () => {
     const host = getHost();
     if (!host) throw new Error("host unavailable");
-    return host.call("app.getOnboarding");
+    const state = await host.call<OnboardingState>("app.getOnboarding");
+    if (!hasManagedProvider?.()) return state;
+    return {
+      steps: state.steps.map((step) => step.id === "provider" || step.id === "secret" ? { ...step, done: true } : step),
+      showChecklist: state.showChecklist && state.steps.some((step) => step.id === "prompt" && !step.done),
+    };
   });
 
   handle(IPC.invoke.appDismissOnboarding, async () => {

@@ -9,7 +9,6 @@ const [
   releaseWorkflowSource,
   desktopPackageSource,
   linuxPackageWorkflowSource,
-  mirrorToCnbWorkflowSource,
   agentRuntimePackageSource,
   i18nPackageSource,
   pluginSdkPackageSource,
@@ -21,7 +20,6 @@ const [
   read("../../../.github/workflows/release.yml"),
   read("../package.json"),
   read("../../../.github/workflows/linux-package.yml"),
-  read("../../../.github/workflows/mirror-to-cnb.yml"),
   read("../../../packages/agent-runtime/package.json"),
   read("../../../packages/i18n/package.json"),
   read("../../../packages/plugin-sdk/package.json"),
@@ -226,7 +224,7 @@ test("release matrix packages both native macOS architectures", () => {
   );
   assert.match(
     releaseWorkflowSource,
-    /name: Package installers \(\$\{\{ matrix\.dist \}\}\)[\s\S]*?if: matrix\.platform != 'macos'[\s\S]*?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} -- --\$\{\{ matrix\.arch \}\}/,
+    /name: Package installers \(\$\{\{ matrix\.dist \}\}\)[\s\S]*?if: matrix\.platform != 'macos'[\s\S]*?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} --\$\{\{ matrix\.arch \}\}/,
   );
   assert.equal(
     JSON.parse(desktopPackageSource).build.mac.artifactName,
@@ -240,8 +238,8 @@ test("release matrix packages both native macOS architectures", () => {
   );
   assert.match(
     releaseWorkflowSource,
-    /Package unsigned macOS installer[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac -- --\$\{\{ matrix\.arch \}\}/,
-    "unsigned macOS builds use the shared artifact naming config",
+    /Package macOS manual-install bundle[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac --\$\{\{ matrix\.arch \}\}/,
+    "manual-install macOS builds use the shared artifact naming config",
   );
   assert.doesNotMatch(
     releaseWorkflowSource,
@@ -260,31 +258,31 @@ test("release matrix packages both native macOS architectures", () => {
   assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
 });
 
-test("macOS release signing is required on tag pushes", () => {
+test("macOS automatic updates require the signed release lane", () => {
   assert.match(
     releaseWorkflowSource,
     /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
   );
   assert.ok(
     releaseWorkflowSource.includes(
-      "MACOS_SIGN_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.sign_macos == true }}",
+      "MACOS_SIGN_RELEASE: ${{ needs.configuration.outputs.macos_signed }}",
     ),
   );
 
-  const unsignedBlock = releaseWorkflowSource.match(
-    /- name: Package unsigned macOS installer[\s\S]*?(?=\n      - name:)/,
+  const manualBlock = releaseWorkflowSource.match(
+    /- name: Package macOS manual-install bundle[\s\S]*?(?=\n      - name:)/,
   )?.[0];
-  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
-  assert.match(unsignedBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
-  assert.match(unsignedBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
-  assert.doesNotMatch(unsignedBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
-  assert.doesNotMatch(unsignedBlock, /forceCodeSigning|notarize/);
+  assert.ok(manualBlock, "macOS manual-install package step is missing");
+  assert.match(manualBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
+  assert.match(manualBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
+  assert.match(manualBlock, /-c\.mac\.identity=-/);
+  assert.match(manualBlock, /codesign --verify --deep --strict/);
+  assert.doesNotMatch(manualBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
+  assert.doesNotMatch(manualBlock, /forceCodeSigning|notarize/);
 
-  assert.match(
-    releaseWorkflowSource,
-    /Require macOS signing and notarization secrets[\s\S]*?Missing GitHub Actions secrets for macOS signing/,
-  );
-  assert.match(releaseWorkflowSource, /APPLE_TEAM_ID must be DUV63RKYTW/);
+  assert.match(releaseWorkflowSource, /Incomplete macOS signing configuration/);
+  assert.match(releaseWorkflowSource, /File.write\("manual-mac\.yml", merged\.to_yaml\)/);
+  assert.match(releaseWorkflowSource, /File.write\("latest-mac\.yml", merged\.to_yaml\) if ENV\["MACOS_SIGN_RELEASE"\] == "true"/);
 
   const signedBlock = releaseWorkflowSource.match(
     /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
@@ -300,10 +298,7 @@ test("macOS release signing is required on tag pushes", () => {
   ]) {
     assert.match(signedBlock, new RegExp(`${secret}:\\s*\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`));
   }
-  // electron-builder throws InvalidConfigurationError when an identity name
-  // keeps the "Developer ID Application:" prefix, so CSC_NAME carries the bare
-  // common name and the CLI must not pass -c.mac.identity.
-  assert.match(signedBlock, /CSC_NAME: "XingYu Liu \(DUV63RKYTW\)"/);
+  assert.match(signedBlock, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
   assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
@@ -367,7 +362,7 @@ test("the signed local macOS lane selects the native runner architecture", () =>
   assert.match(releaseMacScriptSource, /MAC_ARCH="\$\{MAC_ARCH:-\$DEFAULT_MAC_ARCH\}"/);
   assert.match(releaseMacScriptSource, /must match the host/);
   assert.match(releaseMacScriptSource, /electron-builder --mac "--\$\{MAC_ARCH\}"/);
-  assert.match(releaseMacScriptSource, /XingYu Liu \(DUV63RKYTW\)/);
+  assert.match(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.match(
     releaseMacScriptSource,
     /MAC_SIGNING_IDENTITY="\$\{MAC_SIGNING_IDENTITY#Developer ID Application: \}"/,
@@ -445,45 +440,12 @@ test("macOS signing instrumentation stays out of the Windows and Linux lanes", (
   assert.doesNotMatch(stepBlock("Package installers"), instrumentation);
   assert.doesNotMatch(stepBlock("Verify Linux host-core glibc floor"), instrumentation);
   assert.doesNotMatch(stepBlock("Export Linux ASAR release asset"), instrumentation);
-  // The unsigned macOS debug lane reports its bundle size but must not gain a
-  // signing identity, notarization, or publishing behaviour.
-  const unsignedBlock = stepBlock("Package unsigned macOS installer");
-  assert.ok(unsignedBlock, "unsigned macOS debug package step is missing");
-  assert.doesNotMatch(unsignedBlock, instrumentation);
+  const manualBlock = stepBlock("Package macOS manual-install bundle");
+  assert.ok(manualBlock, "macOS manual-install package step is missing");
+  assert.doesNotMatch(manualBlock, instrumentation);
 });
 
-test("GitHub releases trigger the CNB mirror pipeline with a JSON payload", () => {
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /release:\s+types:\s+\[published, edited\]/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /workflow_dispatch:\s+inputs:\s+tag:/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /if: github\.repository == 'vastsa\/PI-Desktop'/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /CNB_MIRROR_TOKEN: \$\{\{\s*secrets\.CNB_MIRROR_TOKEN\s*\}\}/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /Missing repository secret CNB_MIRROR_TOKEN/,
-  );
-  assert.match(
-    mirrorToCnbWorkflowSource,
-    /https:\/\/api\.cnb\.cool\/aixk\/Pi-Desktop\/-\/build\/start/,
-  );
-  assert.match(mirrorToCnbWorkflowSource, /event: "api_trigger_mirror"/);
-  assert.match(mirrorToCnbWorkflowSource, /env: \{ MIRROR_TAGS: \$tag \}/);
-  assert.match(mirrorToCnbWorkflowSource, /jq -n --arg tag "\$MIRROR_TAG"/);
-  assert.match(mirrorToCnbWorkflowSource, /curl --fail-with-body/);
-  assert.doesNotMatch(
-    mirrorToCnbWorkflowSource,
-    /-d ".*github\.event\.release\.tag_name/,
-    "JSON payload must not interpolate the release tag through YAML string escaping",
-  );
+test("the iAgent release stays in its GitHub repository", async () => {
+  await assert.rejects(access(new URL("../../../.github/workflows/mirror-to-cnb.yml", import.meta.url)));
+  assert.doesNotMatch(releaseWorkflowSource, /CNB_MIRROR_TOKEN|DUV63RKYTW/);
 });

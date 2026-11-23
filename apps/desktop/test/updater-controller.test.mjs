@@ -49,7 +49,7 @@ class FakeUpdater extends EventEmitter {
   quitAndInstall() {}
 }
 
-function createController({ updater, settings = {}, persist = async () => {} }) {
+function createController({ updater, settings = {}, persist = async () => {}, ...installation }) {
   const logger = { app: () => {} };
   const sent = [];
   const controller = new AppUpdaterController({
@@ -61,9 +61,37 @@ function createController({ updater, settings = {}, persist = async () => {} }) 
     autoUpdater: updater,
     readUpdateSettings: async () => settings,
     persistDismissedVersion: persist,
+    ...installation,
   });
   return { controller, sent };
 }
+
+test("unsigned macOS checks the manual release feed without installing, even with automatic saved", async () => {
+  const updater = new FakeUpdater();
+  const { controller } = createController({
+    updater, macUpdatesCapable: false, settings: { updatePreference: "automatic" },
+  });
+  await controller.check();
+  assert.equal(controller.getState().mode, "manual");
+  assert.equal(controller.getState().releasesUrl, "https://github.com/nbb2025/PI-Desktop/releases/latest");
+  assert.equal(updater.channel, "manual");
+  assert.equal(updater.allowDowngrade, false);
+  assert.deepEqual(updater.downloadStarts, []);
+  controller.dispose();
+});
+
+test("32-bit Windows uses its own installer feed and can download in-app", async () => {
+  const updater = new FakeUpdater();
+  const { controller } = createController({
+    updater, platform: "win32", arch: "ia32", distribution: "installed",
+  });
+  await controller.check();
+  assert.equal(controller.getState().mode, "in-app");
+  assert.equal(updater.channel, "latest-ia32");
+  assert.equal(updater.allowDowngrade, false);
+  assert.deepEqual(updater.downloadStarts, ["0.16.1"]);
+  controller.dispose();
+});
 
 test("dismissing an in-app update cancels its download and disables install on quit", async () => {
   const updater = new FakeUpdater();

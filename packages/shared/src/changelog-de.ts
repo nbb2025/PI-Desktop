@@ -3,8 +3,9 @@ import type { ChangelogEntry } from "./changelog.js";
 export const deEntries: ChangelogEntry[] = [
   {
     version: "0.24.0",
-    date: "2026-11-20",
+    date: "2026-11-24",
     highlights: [
+      "Melde dich bei iAgent an, um Chatmodelle, Gruppentarife und Denkstufen zu synchronisieren und asynchrone Bilder zu erzeugen.",
       "Bei einer Neuinstallation erzeugt das mitgelieferte Plugin „Offizielle Erweiterungen“ Sitzungstitel automatisch; Vorschläge, Entwurfsverbesserung und KI-Gedächtnis bleiben aus, bis du sie einschaltest.",
       "Neue Aufgabe startet jetzt einen temporären Chat außerhalb von Projekten, und Unterhaltungen lassen sich zwischen Projekten oder zurück in den temporären Chat verschieben.",
       "Auf der leeren Startseite wechselst du das Projekt per Klick auf den Projektnamen oder „temporär“ im Titel; das projektlose Ziel heißt jetzt überall Temporärer Chat.",

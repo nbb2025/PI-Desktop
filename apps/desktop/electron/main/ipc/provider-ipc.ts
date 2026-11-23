@@ -23,6 +23,8 @@ import {
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { IpcRegistrar } from "./types";
+import { isIagentProvider } from "../iagent/catalog";
+import type { IagentIntegration } from "../iagent/integration";
 /**
  * One line explaining why a candidate sweep found nothing: every endpoint that
  * was tried and what it answered. The list is the explanation the settings
@@ -76,6 +78,7 @@ export type ProviderIpcDependencies = {
     | "publishedModelFor"
   >;
   vendorOAuth: VendorOAuth;
+  iagent?: IagentIntegration;
   logger: Pick<Logger, "app">;
   enrichProvider: (provider: RuntimeProvider, selectedModelId?: string) => any;
   listRuntimeProviders: () => Promise<RuntimeProvider[]>;
@@ -90,6 +93,7 @@ export function registerProviderIpc({
   getHost,
   modelsDevCatalog,
   vendorOAuth,
+  iagent,
   logger,
   enrichProvider,
   listRuntimeProviders,
@@ -113,6 +117,7 @@ export function registerProviderIpc({
   });
   handle(IPC.invoke.providersRefreshModelCatalog, async () => {
     const refreshed = await modelsDevCatalog.refresh();
+    if (refreshed) await iagent?.reapplyMetadata();
     return { refreshed, status: modelsDevCatalog.getStatus() };
   });
   // Status only: the snapshot is bundled with the release and this reports what
@@ -350,6 +355,9 @@ export function registerProviderIpc({
     ) => {
       if (!host) throw new Error("host unavailable");
       const req = typeof input === "string" ? { providerId: input } : input ?? {};
+      if (req.providerId && isIagentProvider(req.providerId) && iagent) {
+        return { models: iagent.modelChoices(req.providerId), source: "catalog" };
+      }
       const providers = req.source === "cache"
         ? (await host.call<{ providers: RuntimeProvider[] }>("providers.list", {
             includeDisabled: true,

@@ -1,6 +1,6 @@
 # 06. Desktop Release Runbook
 
-> Scope: D126/D285/D603 tag artifacts for macOS arm64 and Intel x64, Windows x64,
+> Scope: D126/D285/D603 tag artifacts for macOS arm64 and Intel x64, Windows x86/x64,
 > and Linux x64 and arm64, including the Linux system-Electron ASAR assets;
 > macOS signing/notarization remains the detailed qualification lane below.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
@@ -14,11 +14,10 @@
 | Local DMG | `pnpm --filter @pi-desktop/desktop dist` | unsigned without a configured certificate | local install test |
 | Release | `scripts/release-macos.sh` | Developer ID + mandatory notarization | distributable artifact |
 
-The static electron-builder config does not embed a certificate identity, so
-contributors without certificates can still package locally. The release lane
-requires an injected Developer ID identity (local) or `CSC_LINK` certificate
-(CI), and fails before publication if signing or notarization verification does
-not pass.
+The static electron-builder config lets contributors package locally without
+a certificate. The Developer ID lane requires an injected identity (local) or
+a `CSC_LINK` certificate (CI). Publication requires successful signature and
+notarization verification for that lane.
 
 On macOS, `pnpm dev` creates and reuses a fingerprinted branded Electron host
 bundle under `.cache/electron-dev/`. Its bundle name, executable, identifier,
@@ -37,7 +36,8 @@ The first `pnpm dev` on Electron 43+ downloads the Electron binary on demand
 (the package no longer installs it during `pnpm install`).
 Packaged lanes use `build/icon.icns` through electron-builder on macOS and
 `build/icon.ico` for the Windows executable and native window icon. The
-renderer imports the same PNG through `BrandLogo`. The PNG is canonical;
+renderer displays the iAgent mark through `BrandLogo` and its stylesheet.
+The source PNG is canonical, and
 `scripts/make-icon.py` derives the multi-size Windows ICO, the 512px
 Windows/Linux package PNG, the
 transparent monochrome `build/tray-icon-mac.png` template, and the iconset/ICNS
@@ -45,17 +45,12 @@ when macOS `iconutil` is available, without overwriting the canonical source.
 
 ## 2. Prerequisites (release lane)
 
-1. Apple Developer account with a **Developer ID Application** certificate in
-   the login keychain. Official certificate:
-   `Developer ID Application: XingYu Liu (DUV63RKYTW)` (Team ID `DUV63RKYTW`).
-2. Environment variables for the local signed lane:
-   - `MAC_SIGNING_IDENTITY` — bare common name `XingYu Liu (DUV63RKYTW)`;
-     electron-builder rejects a name that keeps the
-     `Developer ID Application:` prefix, so the script strips it
-   - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` — required for
-     notarization (`APPLE_TEAM_ID` must be `DUV63RKYTW`)
-3. Rust toolchain and pnpm workspace installed. The Rust toolchain must run on
-   the native macOS runner: arm64 for Apple Silicon or x86_64 for Intel.
+1. Signed distribution requires a Developer ID Application certificate for
+   the iAgent publisher and Apple notarization credentials for the same team.
+2. For local signing, set `MAC_SIGNING_IDENTITY` to your certificate common
+   name and set `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
+3. Use the native Rust and Electron architecture on macOS. Windows x86 uses
+   the `i686-pc-windows-msvc` Rust target on the x64 runner.
 
 ## 3. What the build ships
 
@@ -189,7 +184,7 @@ Pre-tag checklist:
 ### 4.2 Build / package
 
 ```bash
-export MAC_SIGNING_IDENTITY="XingYu Liu (DUV63RKYTW)"
+export MAC_SIGNING_IDENTITY="Your Developer ID Application certificate common name"
 export APPLE_ID=...
 export APPLE_APP_SPECIFIC_PASSWORD=...
 export APPLE_TEAM_ID=...
@@ -204,44 +199,34 @@ host. This keeps the native Rust host sidecar and Electron package aligned.
 
 ### 4.3 GitHub tag and manual workflow
 
-The GitHub Release workflow starts all native platform runners without a
-separate validation-job barrier. Each runner validates that the pushed tag
-matches `apps/desktop/package.json` immediately after checkout, before package
-inputs are prepared.
+Push a version tag such as `v0.24.0` on a validated commit to
+[`nbb2025/PI-Desktop`](https://github.com/nbb2025/PI-Desktop). The tag must
+match the version in `apps/desktop/package.json`. The Release workflow verifies
+the workspace before the native packaging matrix, then publishes the complete
+set of artifacts and updater metadata. A manual workflow dispatch builds
+artifacts without publishing a release.
 
-On every platform, the release preparation step starts the locked Rust host
-build in parallel with pnpm installation and native dependency rebuilding. It
-then builds only the workspace dependencies selected by
-`@pi-desktop/desktop^...`, failing if that dependency selection is unexpectedly
-empty. The platform `dist:*` command remains responsible for bundling the agent
-runtime, verifying the host build, building the Desktop application once, and
-invoking electron-builder. This avoids a redundant Desktop build without
-changing the package scripts or release artifacts.
+Windows x64 keeps the NSIS, ZIP, and portable executables. Windows x86 ships
+`PI-Desktop-Setup-<version>-ia32.exe` with its matching i686 host core.
+The pipeline checks the PE machine type of both binaries. Windows NSIS
+installers discover updates through `latest.yml` on x64 and
+`latest-ia32.yml` on x86. Native voice libraries that only ship Windows
+x64 binaries are unavailable on x86.
 
-**Default macOS release policy:** GitHub tag releases Developer ID-sign,
-notarize, staple, and Gatekeeper-verify macOS DMG/ZIP before upload (D450 /
-ADR 0289). Missing signing or notarization secrets fail the job. A
-`workflow_dispatch` run may set `sign_macos: false` only to produce unsigned
-debug artifacts; that path must not be used for a GitHub Release tag. Local
-`scripts/release-macos.sh` remains the explicit signed local lane; `pnpm dist:mac`
-stays unsigned without a configured certificate (D078).
+macOS uses native arm64 and Intel x64 runners, with a matching Rust host core.
+The workflow selects Developer ID signing when all five repository secrets
+are available and rejects incomplete configurations. A tag with no signing
+credentials can publish manual-install DMG/ZIP assets and `manual-mac.yml`.
+That lane seals the application bundle with an ad-hoc signature and verifies
+its integrity before upload. It uses in-app discovery and links to the download
+page. Developer ID release bundles carry the in-app installation flag and publish
+`latest-mac.yml` in addition to the manual feed. Downloadable ZIPs in the
+merged feeds are hashed and kept architecture-specific.
 
-The macOS matrix uses `macos-15` for arm64 and `macos-15-intel` for Intel x64.
-Each job verifies `uname -m`, passes the matching `--arm64` or `--x64` flag to
-electron-builder, and builds `pi-desktop-host-core` on that same native
-runner. Tag builds and `sign_macos: true` (the dispatch default) receive
-`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
-`APPLE_TEAM_ID` only from GitHub Actions secrets, pin the certificate through
-`CSC_NAME=XingYu Liu (DUV63RKYTW)` (bare common name — electron-builder rejects
-the `Developer ID Application:` prefix), force code signing and
-`notarytool` notarization of `PI-Desktop.app`. The DMG is then submitted to the
-same service on its own (`scripts/notarize-and-staple-macos-release-dmg.sh`),
-and only an `Accepted` status allows the ticket to be stapled. Verification
-then checks the identity, code-signing integrity (including
-`pi-desktop-host-core`), Gatekeeper `Notarized Developer ID`, and both stapled
-tickets before any artifact upload. The per-architecture `latest-mac.yml` files
-are renamed before upload; the publish job merges them into one feed after
-downloading both artifacts.
+For the signed lane, electron-builder signs and notarizes the application.
+The DMG then receives separate notarization and stapling. Before upload,
+`verify-macos-release.sh` validates the configured Apple team, package and
+host-core signatures, Gatekeeper verdict, and both stapled tickets.
 
 For app and DMG tickets, the release path retries the exact `stapler staple`
 and `stapler validate` operations, at most six total attempts with a
@@ -259,7 +244,7 @@ level. Both public architectures are therefore explicit: the arm64 lane
 publishes `PI-Desktop-<version>-arm64.dmg` and
 `PI-Desktop-<version>-arm64-mac.zip`, while the Intel x64 lane publishes
 `PI-Desktop-<version>-x64.dmg` and `PI-Desktop-<version>-x64-mac.zip`. This
-applies to both unsigned and signed macOS lanes, including local release builds,
+applies to both macOS release lanes, including local release builds,
 and ensures each generated updater feed references its architecture-labelled
 asset names and matching checksums. Before upload, each macOS runner requires
 exactly one architecture-labelled DMG and ZIP (including blockmaps) and rejects
@@ -270,8 +255,8 @@ gesture. The app and Applications link are the only items in the window.
 
 The macOS ZIP contains `PI-Desktop.app` at its root. Neither the DMG nor ZIP
 ships an opening-help note or executable first-launch helper, including local
-and unsigned debug builds. Tagged artifacts remain signed and notarized; the
-unsigned lane is for debugging and does not imply Gatekeeper qualification.
+and manual-install builds. Apple Gatekeeper qualification requires Developer ID
+signing and notarization.
 
 DMG, ZIP, NSIS, AppImage, deb, rpm, blockmap, and updater feed outputs are already
 compressed or compression-insensitive. The workflow therefore uploads their
@@ -287,28 +272,11 @@ The Linux updater feeds carry the architecture they were built for:
 channel files `electron-updater` requests on the matching architecture, so a
 lane fails before upload if its own feed is missing.
 
-### 4.4 CNB mirror trigger
+### 4.4 Release and feedback URLs
 
-After `softprops/action-gh-release` publishes or updates a GitHub Release,
-`.github/workflows/mirror-to-cnb.yml` starts the CNB pipeline at
-`aixk/Pi-Desktop`. GitHub Release remains the canonical artifact source; CNB
-is a copy of the same tag for users who pull from
-https://cnb.cool/aixk/Pi-Desktop.
-
-The job:
-
-- runs only on `vastsa/PI-Desktop`
-- fires on `release` `published` / `edited`, and on `workflow_dispatch` with
-  an explicit tag such as `v0.14.6`
-- sends event `api_trigger_mirror` and `MIRROR_TAGS` set to that tag
-- uses repository secret `CNB_MIRROR_TOKEN` (already configured) and fails
-  closed if the secret is empty
-- builds the JSON body with `jq` so a missing tag cannot produce an empty
-  `MIRROR_TAGS` value on a manual run
-
-Re-running the workflow for the same tag is safe if the CNB pipeline is
-idempotent. It does not rebuild desktop artifacts and does not change
-electron-updater feeds.
+Installer metadata, release discovery, SSH host assets and the feedback
+form use the iAgent GitHub repository. The application homepage is
+`https://ai.iagent.dev`.
 
 ### 4.5 GitHub Actions secrets for macOS signing
 
@@ -320,9 +288,9 @@ app-specific password. Never `echo` these values in CI.
 |---|---|
 | `CSC_LINK` | Base64 of the exported Developer ID Application `.p12` (Certificate + Private Key). electron-builder also accepts a file path, but CI uses the secret body. |
 | `CSC_KEY_PASSWORD` | Password used when exporting that `.p12` |
-| `APPLE_ID` | Apple ID email that belongs to team `DUV63RKYTW` |
+| `APPLE_ID` | Apple ID email that belongs to the release certificate team |
 | `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password from https://appleid.apple.com → Sign-In and Security → App-Specific Passwords |
-| `APPLE_TEAM_ID` | `DUV63RKYTW` |
+| `APPLE_TEAM_ID` | Ten-character Apple Developer team ID on the certificate |
 
 Encode the p12 locally (do not paste the output into chat or the repo):
 
@@ -508,9 +476,10 @@ publication:
   plugin removes `woff` and `truetype` `src` entries before Vite registers
   them as assets. The bundled Chromium supports `woff2` universally, so those
   faces would be emitted and never served.
-- **Brand marks are renderer-sized.** `src/assets/brand/logo-{light,dark}.png`
-  are the renderer assets. `build/icon_1024.png` and `build/logo_dark.png` are
-  electron-builder installer icons and must not be imported by the renderer.
+- **Brand marks are renderer-sized.** `src/assets/brand/iagent-mark.png`
+  supplies the renderer mark and is the source for the native assets
+  generated by `scripts/make-icon.py`. Native icon derivatives under
+  `build/` stay outside the renderer bundle.
 
 Renderer output measured on 2026-08-26 after applying these three controls,
 against the same tree at `v0.10.8`:

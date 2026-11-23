@@ -286,9 +286,10 @@ If user selects model tagged without tools while in Agent mode:
 
 ## 6. Refresh behavior
 
-The bundled models.dev snapshot is the startup baseline. Startup reads no
-remote catalog and uses no ambient credentials. `providers.refreshModelCatalog`
-refreshes models.dev explicitly; settings metadata lookups themselves are local.
+The bundled models.dev snapshot is the startup baseline. Settings metadata
+lookups are local. `providers.refreshModelCatalog` refreshes models.dev
+explicitly, and a connected iAgent account enables a periodic background
+refresh without account credentials (see [iAgent accounts](11-provider-model-system.md#iagent-accounts)).
 
 For keyed endpoints, live discovery supplies IDs and models.dev enriches their
 metadata. A positive safe integer context/input or output limit reported on a live

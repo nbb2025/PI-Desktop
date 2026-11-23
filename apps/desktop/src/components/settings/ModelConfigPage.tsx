@@ -34,6 +34,7 @@ import {
 } from "./image-generation-default";
 import { copyProviderConfiguration, type ProviderCopyDraft } from "./provider-copy";
 import { ImageGenerationModelRow } from "./ImageGenerationModelRow";
+import { IagentAccountCard } from "./IagentAccountCard";
 import { OAuthLoginDialog } from "./OAuthLoginDialog";
 import { ProviderSetupDialog } from "./ProviderSetupDialog";
 import { ServiceList } from "./ServiceList";
@@ -102,6 +103,7 @@ function chatModelOptions(
 export function ModelConfigPage() {
   const { t, i18n } = useTranslation();
   const providers = useAppStore((s) => s.providers);
+  const editableProviders = providers.filter((provider) => provider.managedBy !== "iagent");
   const providerModels = useAppStore((s) => s.providerModels);
   const settings = useAppStore((s) => s.settings);
   const refreshProviders = useAppStore((s) => s.refreshProviders);
@@ -452,12 +454,13 @@ export function ModelConfigPage() {
 
   return (
     <div className="settings-stack model-config-page">
+      <IagentAccountCard />
       <section className="settings-card-block">
         <div className="model-config-section-head">
           <div className="settings-card-heading-line">
             <h3 className="settings-card-heading">{t("settings.providers")}</h3>
-            {providers.length > 0 ? (
-              <span className="provider-section-count">{providers.length}</span>
+            {editableProviders.length > 0 ? (
+              <span className="provider-section-count">{editableProviders.length}</span>
             ) : null}
           </div>
           <div className="provider-section-head-actions">
@@ -489,7 +492,7 @@ export function ModelConfigPage() {
         </div>
 
         <div className="settings-panel model-provider-panel">
-          {providers.length === 0 ? (
+          {editableProviders.length === 0 ? (
             <div className="model-provider-empty">
               <div className="model-provider-empty-icon" aria-hidden>
                 <IconServer size={18} />
@@ -505,7 +508,7 @@ export function ModelConfigPage() {
             </div>
           ) : (
             <ServiceList
-              providers={providers}
+              providers={editableProviders}
               accountFor={accountFor}
               busy={
                 setupFor !== null ||

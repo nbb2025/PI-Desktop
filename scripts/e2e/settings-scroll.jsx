@@ -33,7 +33,7 @@ let updateState = {
   status: "available",
   currentVersion: "0.15.8",
   availableVersion: "0.15.9",
-  releasesUrl: "https://github.com/vastsa/PI-Desktop/releases/latest",
+  releasesUrl: "https://github.com/nbb2025/PI-Desktop/releases/latest",
 };
 const updateStateListeners = new Set();
 window.piDesktop = {

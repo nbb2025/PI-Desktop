@@ -14,6 +14,7 @@ import {
 import {
   type CommandShellCatalog,
   GEN_UI_DIRECTORY_NAME,
+  iagentThinkingLevel,
   imageGenerationBindings,
   isActiveInProject,
   isCommandShellCatalog,
@@ -46,6 +47,8 @@ import type { LoadedSkillDocument } from "../skill-document";
 import type { UserMcpRuntime } from "../user-mcp";
 import type { RuntimeState } from "./context";
 import type { RuntimeProvider } from "./provider-catalog";
+import { isIagentProvider } from "../iagent/catalog";
+import type { IagentIntegration } from "../iagent/integration";
 
 const ErrorCodes = {
   ...SharedErrorCodes,
@@ -63,6 +66,7 @@ export type SessionLaunchRuntimeDependencies = {
   sessionProjects: Map<string, string | null>;
   dataDir: string;
   vendorOAuth: VendorOAuth;
+  iagent?: IagentIntegration;
   modelsDevCatalog: ModelsDevCatalog;
   getWorkspacePath: () => string | null;
   pluginActiveInProject: (
@@ -92,6 +96,7 @@ export function createSessionLaunchRuntime({
   sessionProjects,
   dataDir,
   vendorOAuth,
+  iagent,
   modelsDevCatalog,
   getWorkspacePath,
   pluginActiveInProject,
@@ -366,16 +371,19 @@ export function createSessionLaunchRuntime({
     const commandShell = remoteWorkspace
       ? await remoteBoot!.workspaceCommandShell(remoteWorkspace.hostKey)
       : (await resolveEffectiveCommandShell()).effective!;
-    const providers = await runtimeState.host!.call<{ providers: RuntimeProvider[] }>(
+    const savedProviders = await runtimeState.host!.call<{ providers: RuntimeProvider[] }>(
       "providers.list",
       { includeDisabled: false },
     );
-    for (const row of providers.providers) modelsDevCatalog.configureAccount(row);
     const requestedProviderId = overrides.providerId ?? session.providerId;
+    const preferred = requestedProviderId ?? settings.defaultProviderId;
+    if (iagent && (!preferred || isIagentProvider(preferred))) await iagent.refresh();
+    const providers: RuntimeProvider[] = [...(iagent?.providers() ?? []), ...savedProviders.providers];
+    for (const row of providers) modelsDevCatalog.configureAccount(row);
     const extensionAgentKey = requestedProviderId
       ? trustedExtensionAgentKeyFromProviderId(requestedProviderId)
       : undefined;
-    const provider: RuntimeProvider = extensionAgentKey
+    let provider: RuntimeProvider | undefined = extensionAgentKey
       ? {
           id: requestedProviderId!,
           name: "Plugin agent",
@@ -384,15 +392,17 @@ export function createSessionLaunchRuntime({
           extensionAgentKey,
         }
       : requestedProviderId
-        ? providers.providers.find((item) => item.id === requestedProviderId && item.enabled !== false)!
+        ? providers.find((item) => item.id === requestedProviderId && item.enabled !== false)
         :
-        providers.providers.find((item) => item.id === settings.defaultProviderId) ||
-        providers.providers.find(
+        providers.find((item) => item.id === settings.defaultProviderId) ||
+        providers.find(
           (item) => item.hasSecret || item.hasOauth || item.authKind === "none",
         ) ||
-        providers.providers[0];
+        providers[0];
     if (!provider) {
-      throw Object.assign(new Error("No provider configured"), {
+      throw Object.assign(new Error(requestedProviderId && isIagentProvider(requestedProviderId)
+        ? "The iAgent group is unavailable. Select an active model."
+        : "No provider configured"), {
         errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
       });
     }
@@ -401,22 +411,20 @@ export function createSessionLaunchRuntime({
     // extension; the host never reads or injects a secret for them.
     const isExtensionAgent = Boolean(extensionAgentKey);
     const isVendorAccount = !isExtensionAgent && provider.authKind === OAUTH_AUTH_KIND;
-    const secret = isExtensionAgent || isVendorAccount
+    const isManaged = iagent !== undefined && isIagentProvider(provider.id);
+    let secret = isExtensionAgent || isVendorAccount || isManaged
       ? { value: undefined }
-      : await runtimeState.host!.call<{ value?: string }>("providers.getSecret", {
-          id: provider.id,
-        });
-    if (!secret.value && !isExtensionAgent && !isVendorAccount && provider.authKind !== "none") {
-      throw Object.assign(new Error("Provider API key missing"), {
-        errorCode: ErrorCodes.PROVIDER_SECRET_MISSING,
-      });
+      : await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id: provider.id });
+    if (!secret.value && !isExtensionAgent && !isVendorAccount && !isManaged && provider.authKind !== "none") {
+      throw Object.assign(new Error("Provider API key missing"), { errorCode: ErrorCodes.PROVIDER_SECRET_MISSING });
     }
-    const modelId = isExtensionAgent
+    let modelId = isExtensionAgent
       ? overrides.modelId ?? session.modelId
       : (provider.id === requestedProviderId
         ? overrides.modelId ?? session.modelId
         : undefined) ||
-      (provider.id === settings.defaultProviderId
+      (provider.id === settings.defaultProviderId &&
+        (!isIagentProvider(provider.id) || provider.models?.some(({ id }) => id === settings.defaultModelId))
         ? settings.defaultModelId
         : undefined) ||
       provider.models?.[0]?.id ||
@@ -425,6 +433,12 @@ export function createSessionLaunchRuntime({
       throw Object.assign(new Error("No model selected for provider"), {
         errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
       });
+    }
+    if (isManaged) {
+      const managed = await iagent.resolveChat(provider.id, modelId);
+      provider = managed.provider;
+      modelId = managed.modelId;
+      secret = { value: managed.value };
     }
     // The authenticated collection owns a vendor account's available model IDs
     // and wire endpoint. models.dev owns metadata; one account can span multiple
@@ -488,13 +502,15 @@ export function createSessionLaunchRuntime({
       });
     }
     const thinkingCapabilities = capabilitiesFromModelConfig(modelConfig);
+    const requestedThinkingLevel = normalizeThinkingLevel(
+      overrides.thinkingLevel ??
+      (provider.id === requestedProviderId ? session.thinkingLevel : undefined) ??
+      storedModel?.defaultThinkingLevel,
+    );
     const thinkingLevel = clampThinkingLevel(
       thinkingCapabilities,
-      normalizeThinkingLevel(
-        overrides.thinkingLevel ??
-          (provider.id === requestedProviderId ? session.thinkingLevel : undefined) ??
-          storedModel?.defaultThinkingLevel,
-      ),
+      isManaged ? iagentThinkingLevel(requestedThinkingLevel, thinkingCapabilities.supportedThinkingLevels)
+        : requestedThinkingLevel,
     );
     const projectPath =
       typeof session.projectPath === "string" && session.projectPath.trim()
@@ -627,7 +643,7 @@ export function createSessionLaunchRuntime({
     });
     const subagentBindings = await resolveSubagentProviders({
       definitions: subagentCatalog.definitions,
-      providers: providers.providers,
+      providers: savedProviders.providers,
       getSecret: async (id: string) =>
         (await runtimeState.host!.call<{ value?: string }>("providers.getSecret", { id })).value,
       resolveVendorBinding: (pinned, pinnedModelId) =>
@@ -640,7 +656,7 @@ export function createSessionLaunchRuntime({
           apiStyle: pinned.apiStyle,
           modelId: pinnedModelId,
         });
-        const configuredProvider = providers.providers.find(
+        const configuredProvider = savedProviders.providers.find(
           (candidate) => candidate.id === pinned.id,
         );
         return configuredProvider
@@ -661,7 +677,7 @@ export function createSessionLaunchRuntime({
     // extra RPC round-trip. Statically pinned entries from definitions take
     // precedence — they were resolved above with stricter diagnostics.
     const subagentModelKeys: string[] = [];
-    for (const row of providers.providers) {
+    for (const row of savedProviders.providers) {
       if (!row.enabled) continue;
       for (const binding of row.models ?? []) {
         if (!binding.availableForSubagents) continue;
@@ -756,7 +772,7 @@ export function createSessionLaunchRuntime({
         provider.id,
         ...Object.values(subagentBindings.providers).map((binding) => binding.id),
       ]
-        .map((id) => providers.providers.find((row) => row.id === id))
+        .map((id) => providers.find((row) => row.id === id))
         .flatMap((row) =>
           row?.authKind === OAUTH_AUTH_KIND
             ? [{ providerId: row.id }]

@@ -5,7 +5,7 @@ import {
   vendorAccountOmitsSessionModel,
 } from "../lib/chat-launch-error";
 import { Composer } from "./Composer";
-import { HomeMascotLogo } from "./HomeMascotLogo";
+import { BrandLogo } from "./BrandLogo";
 import { HomeProjectSwitcher } from "./HomeProjectSwitcher";
 import { IconX } from "./icons";
 import { TooltipButton } from "./ui";
@@ -182,7 +182,7 @@ export const ChatSurface = memo(function ChatSurface({
                   data-testid="home-icon"
                   aria-hidden
                 >
-                  <HomeMascotLogo />
+                  <BrandLogo size={100} />
                 </div>
                 <h1>
                   {heroProject ? (

@@ -27,7 +27,7 @@ const LANE_SCRIPTS = [
   "macos-stapler-retry-shim.sh",
   "macos-bundle-inventory.mjs",
 ];
-const SIGNING_IDENTITY = "Developer ID Application: XingYu Liu (DUV63RKYTW)";
+const SIGNING_IDENTITY = "Developer ID Application: Fixture Publisher (ABCDE12345)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
 
 async function writeStubs(bin, log, repoRoot) {
@@ -56,6 +56,7 @@ exit 0
 printf 'codesign %s\\n' "$*" >> "${log}"
 if [[ "$*" == *"-dv"* ]]; then
   echo "Authority=${SIGNING_IDENTITY}" >&2
+  echo "TeamIdentifier=ABCDE12345" >&2
   echo "flags=0x10000(runtime)" >&2
 fi
 exit 0
@@ -107,7 +108,8 @@ test(
         PATH: `${bin}:${process.env.PATH}`,
         APPLE_ID: "release@example.com",
         APPLE_APP_SPECIFIC_PASSWORD: "app-specific-password",
-        APPLE_TEAM_ID: "DUV63RKYTW",
+        APPLE_TEAM_ID: "ABCDE12345",
+        MAC_SIGNING_IDENTITY: SIGNING_IDENTITY,
         STAPLE_DELAY_SECONDS: "1",
       },
     });
@@ -124,7 +126,7 @@ test(
       /PI_STAPLER_MAX_ATTEMPTS="\$\{PI_STAPLER_MAX_ATTEMPTS:-6\}"/,
       "the local signed lane enables the same bounded app stapling retries",
     );
-    assert.match(builderCall, /-c\.mac\.identity=XingYu Liu \(DUV63RKYTW\)/);
+    assert.match(builderCall, /-c\.mac\.identity=Fixture Publisher \(ABCDE12345\)/);
     assert.match(builderCall, /-c\.mac\.forceCodeSigning=true/);
     assert.match(builderCall, /-c\.mac\.notarize=true/);
     assert.doesNotMatch(

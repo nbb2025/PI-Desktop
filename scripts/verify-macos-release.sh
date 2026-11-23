@@ -7,11 +7,10 @@ set -euo pipefail
 RELEASE_DIR="${1:-apps/desktop/release}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PRODUCT_NAME="PI-Desktop"
-# Accepts either the bare common name ("XingYu Liu (DUV63RKYTW)") or the full
-# certificate label ("Developer ID Application: XingYu Liu (DUV63RKYTW)").
-IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
-IDENTITY_NAME="${IDENTITY_NAME#Developer ID Application: }"
-EXPECTED_IDENTITY="Developer ID Application: ${IDENTITY_NAME}"
+if [[ ! "${APPLE_TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]]; then
+  echo "error: configure APPLE_TEAM_ID for the release signing identity." >&2
+  exit 1
+fi
 STAPLE_ATTEMPTS="${PI_STAPLER_MAX_ATTEMPTS:-${STAPLE_ATTEMPTS:-6}}"
 STAPLE_DELAY_SECONDS="${PI_STAPLER_RETRY_DELAY_SECONDS:-${STAPLE_DELAY_SECONDS:-10}}"
 
@@ -49,8 +48,9 @@ HOST_CORE="$APP/Contents/Resources/bin/pi-desktop-host-core"
 echo "==> Inspecting Developer ID signature: $APP"
 SIGNATURE_INFO="$(codesign -dv --verbose=4 "$APP" 2>&1)"
 printf '%s\n' "$SIGNATURE_INFO"
-if [[ "$SIGNATURE_INFO" != *"Authority=${EXPECTED_IDENTITY}"* ]]; then
-  echo "error: $APP is not signed with $EXPECTED_IDENTITY." >&2
+if ! grep -Fq 'Authority=Developer ID Application: ' <<<"$SIGNATURE_INFO" ||
+   ! grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" <<<"$SIGNATURE_INFO"; then
+  echo "error: $APP is not signed by the configured Developer ID team." >&2
   exit 1
 fi
 if [[ "$SIGNATURE_INFO" != *"flags=0x10000(runtime)"* && "$SIGNATURE_INFO" != *"flags=runtime"* && "$SIGNATURE_INFO" != *"runtime"* ]]; then

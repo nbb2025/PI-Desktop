@@ -1,13 +1,14 @@
 import type { ImageApi, ImageModel, Models } from "@earendil-works/pi-ai";
 import * as openrouterImages from "@earendil-works/pi-ai/api/openrouter-images";
 import { createAccountModels, type RuntimeProviderConfig } from "../provider-binding.js";
-import { CODEX_IMAGE_VENDOR_KEY } from "@pi-desktop/shared";
+import { CODEX_IMAGE_VENDOR_KEY, IAGENT_ORIGIN } from "@pi-desktop/shared";
 import {
   OPENAI_IMAGES_API,
   codexImagesBaseUrl,
   openAIImagesAdapter,
 } from "./openai-images.js";
 import { imageError, type ImageDownloadOptions } from "./download.js";
+import { IAGENT_GEMINI_IMAGES_API, iagentGeminiImages } from "./iagent-gemini.js";
 
 export type ImageEndpoint = {
   baseUrl: string;
@@ -17,11 +18,15 @@ export type ImageEndpoint = {
   providerId?: string;
   vendorKey?: string;
   authKind?: string;
+  iagentProtocol?: "openai" | "gemini" | "grok";
   resolveAuth?: RuntimeProviderConfig["resolveAuth"];
   /** Effective typed model from the host's shared Pi account registry. */
   nativeModel?: ImageModel<ImageApi>;
 };
-export type ImageBinding = { models: Models; model: ImageModel<ImageApi>; accountId?: string };
+export type ImageBinding = {
+  models: Models; model: ImageModel<ImageApi>; accountId?: string;
+  iagentProtocol?: ImageEndpoint["iagentProtocol"];
+};
 
 /**
  * Whether this endpoint is a signed-in Codex (ChatGPT) account.
@@ -38,6 +43,7 @@ function isCodexImageEndpoint(endpoint: ImageEndpoint): boolean {
 
 /** An explicitly marked legacy image binding is an operation override, not chat capability inference. */
 export function createImageBinding(endpoint: ImageEndpoint, downloads: ImageDownloadOptions = {}): ImageBinding {
+  if (endpoint.iagentProtocol && endpoint.baseUrl !== `${IAGENT_ORIGIN}/v1`) throw imageError("IMAGE_INVALID_ENDPOINT");
   const providerId = endpoint.vendorKey?.trim() || endpoint.providerId || "pi-desktop-images";
   const codexImages = isCodexImageEndpoint(endpoint);
   const known = codexImages ? undefined : endpoint.nativeModel;
@@ -58,7 +64,7 @@ export function createImageBinding(endpoint: ImageEndpoint, downloads: ImageDown
       cost: { input: NaN, output: NaN, cacheRead: NaN, cacheWrite: NaN },
     }),
     id: endpoint.modelId, provider: providerId,
-    api: native ? "openrouter-images" : OPENAI_IMAGES_API,
+    api: endpoint.iagentProtocol === "gemini" ? IAGENT_GEMINI_IMAGES_API : native ? "openrouter-images" : OPENAI_IMAGES_API,
     baseUrl: codexImages ? codexImagesBaseUrl(endpoint.baseUrl) : endpoint.baseUrl,
     headers: endpoint.headers,
   };
@@ -70,10 +76,11 @@ export function createImageBinding(endpoint: ImageEndpoint, downloads: ImageDown
   }, {
     models: [model],
     images: {
-      [model.api]: native
+      [model.api]: endpoint.iagentProtocol === "gemini" ? iagentGeminiImages(downloads) : native
         ? openrouterImages
-        : openAIImagesAdapter(downloads, codexImages ? "codex-json" : "multipart"),
+        : openAIImagesAdapter(downloads, endpoint.iagentProtocol === "grok" ? "iagent-grok"
+          : endpoint.iagentProtocol === "openai" ? "iagent-openai" : codexImages ? "codex-json" : "multipart"),
     },
   });
-  return { models, model, accountId: endpoint.providerId };
+  return { models, model, accountId: endpoint.providerId, iagentProtocol: endpoint.iagentProtocol };
 }

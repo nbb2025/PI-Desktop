@@ -2,7 +2,7 @@ export const PROTOCOL_VERSION = 11 as const;
 export const SCHEMA_VERSION = 16 as const;
 export const APP_ID = "net.aiuo.pi-desktop";
 export const APP_NAME = "PI-Desktop";
-export const APP_VERSION = "0.24.0-beta.1";
+export const APP_VERSION = "0.24.0";
 
 export const APP_MENU_COMMANDS = [
   "newTask",
@@ -297,6 +297,11 @@ export const IPC = {
     remoteHostCreateSession: "pi-desktop/remoteHost/createSession",
     remoteHostSyncProviders: "pi-desktop/remoteHost/syncProviders",
     providersList: "pi-desktop/providers/list",
+    iagentStatus: "pi-desktop/iagent/status",
+    iagentLogin: "pi-desktop/iagent/login",
+    iagentConfirm: "pi-desktop/iagent/confirm",
+    iagentLogout: "pi-desktop/iagent/logout",
+    iagentRefresh: "pi-desktop/iagent/refresh",
     providersReorder: "pi-desktop/providers/reorder",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",
@@ -553,6 +558,7 @@ export const IPC = {
     modesCatalogChanged: "pi-desktop/modes/event/catalogChanged",
     todosChanged: "pi-desktop/todos/event/changed",
     providersOauth: "pi-desktop/providers/oauth/event",
+    iagentChanged: "pi-desktop/iagent/event/changed",
     mcpOauth: "pi-desktop/mcp/oauth/event",
     updatesState: "pi-desktop/updates/event/state",
     voiceStateChanged: "pi-desktop/voice/event/stateChanged",

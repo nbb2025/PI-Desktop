@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { rename } from "node:fs/promises";
 import process from "node:process";
 
 const forwardedArgs = process.argv.slice(2);
@@ -47,6 +48,7 @@ function runBuilder(args) {
 }
 
 if (target === "win") {
+  const ia32 = forwardedArgs.includes("--ia32");
   await runBuilder([
     "--win",
     "nsis",
@@ -54,23 +56,28 @@ if (target === "win") {
     "never",
     ...forwardedArgs,
     "-c.extraMetadata.piDistribution=installed",
+    ...(ia32 ? ["-c.nsis.artifactName=PI-Desktop-Setup-${version}-ia32.${ext}"] : []),
   ]);
-  await runBuilder([
-    "--win",
-    "zip",
-    "--publish",
-    "never",
-    ...forwardedArgs,
-    "-c.extraMetadata.piDistribution=zip",
-  ]);
-  await runBuilder([
-    "--win",
-    "portable",
-    "--publish",
-    "never",
-    ...forwardedArgs,
-    "-c.extraMetadata.piDistribution=portable",
-  ]);
+  if (ia32) {
+    await rename("release/latest.yml", "release/latest-ia32.yml");
+  } else {
+    await runBuilder([
+      "--win",
+      "zip",
+      "--publish",
+      "never",
+      ...forwardedArgs,
+      "-c.extraMetadata.piDistribution=zip",
+    ]);
+    await runBuilder([
+      "--win",
+      "portable",
+      "--publish",
+      "never",
+      ...forwardedArgs,
+      "-c.extraMetadata.piDistribution=portable",
+    ]);
+  }
 } else {
   await runBuilder([
     `--${target}`,

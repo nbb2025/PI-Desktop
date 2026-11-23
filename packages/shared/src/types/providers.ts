@@ -26,6 +26,8 @@ export type ProviderPublic = {
   headers?: Record<string, string>;
   /** Per-model settings selected in the provider dialog. */
   models: ModelBinding[];
+  /** Effective standard account multiplier for an iAgent chat group. */
+  iagentRate?: number;
   /** @deprecated Use `models[0]?.id`; retained for older runtime consumers. */
   defaultModelId?: string;
   apiStyle?: string;
@@ -47,6 +49,8 @@ export type ProviderPublic = {
    * `providers.delete` refuse it.
    */
   ownerPluginId?: string;
+  /** An account-backed provider projected from iAgent's available groups. */
+  managedBy?: "iagent";
   createdAt: string;
   updatedAt: string;
 };

@@ -157,3 +157,16 @@ input images inline as data URLs. Every other OAuth account stays ineligible,
 and the adapter cannot fabricate entitlement or fall back to another account.
 The candidate disappears as soon as the account's credential is removed.
 Unknown pricing remains unknown. Images never route through the chat selector.
+
+## iAgent image tasks
+
+A linked iAgent account with no configured image binding uses the website's
+image configuration and async task endpoints. The adapter submits a single
+task per image request and polls its ID on the iAgent origin with the same
+workspace key. Safe queries may be retried with backoff. An ambiguous
+submission, failed task, or cancelled wait never triggers another generation
+request. When async generation is disabled, the synchronous gateway route
+is used. The async wait allows the gateway's 30-minute upstream deadline and
+result publication while still responding to cancellation. The tool renders
+both inline image bytes and validated public result URLs through its usual
+local output path.

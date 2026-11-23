@@ -3,6 +3,7 @@ import {
   boundedBytes, downloadGeneratedImage, generatedImageType, imageError, MAX_IMAGE_BYTES,
   type ImageDownloadOptions,
 } from "./download.js";
+import { requestIagentImage } from "./iagent-tasks.js";
 
 /** Private wire API, not a provider identity or a second model catalog. */
 export const OPENAI_IMAGES_API = "pi-desktop-openai-images";
@@ -32,7 +33,7 @@ export function codexImagesBaseUrl(baseUrl: string): string {
  * `multipart` is the OpenAI Images API: a form for edits, JSON for generation.
  * `codex-json` is the Codex backend: JSON for both, input images as data URLs.
  */
-export type ImageRequestTransport = "multipart" | "codex-json";
+export type ImageRequestTransport = "multipart" | "codex-json" | "iagent-openai" | "iagent-grok";
 
 export function safeImageError(error: unknown): string {
   return error && typeof error === "object" && "errorCode" in error &&
@@ -64,7 +65,17 @@ export function openAIImagesAdapter(
         const images = context.input.filter(item => item.type === "image");
         const responseFormat = /^dall-e-[23]$/i.test(model.id) ? "b64_json" : undefined;
         let body: BodyInit;
-        if (transport === "codex-json") {
+        if (transport === "iagent-grok") {
+          const editModel = /^grok-imagine-edit$/i.test(model.id.split("/").at(-1) ?? "");
+          if (editModel !== Boolean(images.length)) throw imageError("IMAGE_EDIT_UNAVAILABLE");
+          const references = images.map((image) => ({ image_url: inputImageDataUrl(image.data) }));
+          headers.set("Content-Type", "application/json");
+          body = JSON.stringify({
+            model: model.id, prompt, n: 1,
+            ...(references.length ? { image: references[0] } : {}),
+            ...(references.length > 1 ? { images: references } : {}),
+          });
+        } else if (transport === "codex-json") {
           // The shape the Codex client sends: one JSON body for generation and
           // editing alike, input images inline as data URLs, size at the
           // backend's own auto default.
@@ -96,7 +107,16 @@ export function openAIImagesAdapter(
           body = JSON.stringify({ model: model.id, prompt, n: 1,
             ...(responseFormat ? { response_format: responseFormat } : {}) });
         }
-        const response = await (options?.fetch ?? fetch)(imageGenerationUrl(model.baseUrl, images.length > 0), {
+        const fetchImpl = options?.fetch ?? fetch;
+        const url = imageGenerationUrl(model.baseUrl, images.length > 0);
+        const operation = images.length > 0 ? "edit" : "generation";
+        const asyncRoute = transport === "iagent-openai" ? `openai-${operation}` as const
+          : transport === "iagent-grok" ? `grok-${operation}` as const : undefined;
+        const managed = asyncRoute ? await requestIagentImage({
+          route: asyncRoute, model: model.id.split("/").at(-1) ?? model.id,
+          syncPath: new URL(url).pathname, headers, body, signal, fetchImpl,
+        }) : undefined;
+        const response = managed?.response ?? await fetchImpl(url, {
           method: "POST", headers, redirect: "error", signal, body,
         });
         await options?.onResponse?.({ status: response.status, headers: Object.fromEntries(response.headers) }, model);
@@ -105,10 +125,14 @@ export function openAIImagesAdapter(
           throw imageError(response.status === 401 || response.status === 403 ? "IMAGE_AUTH_FAILED" : `IMAGE_HTTP_${response.status}`);
         }
         // A response may contain several images. Bound the entire JSON as well as every image.
-        const raw = await boundedBytes(response, Math.ceil(MAX_IMAGE_BYTES * 4 / 3) * 10 + 65536);
-        let payload: unknown;
-        try { payload = JSON.parse(Buffer.from(raw).toString("utf8")); }
-        catch { throw imageError("IMAGE_INVALID_RESPONSE"); }
+        let payload: unknown = managed?.payload;
+        if (managed) {
+          if (managed.taskId) result.responseId = managed.taskId;
+        } else {
+          const raw = await boundedBytes(response, Math.ceil(MAX_IMAGE_BYTES * 4 / 3) * 10 + 65536);
+          try { payload = JSON.parse(Buffer.from(raw).toString("utf8")); }
+          catch { throw imageError("IMAGE_INVALID_RESPONSE"); }
+        }
         const reported = (payload as { usage?: Record<string, unknown> })?.usage;
         if (reported) {
           const count = (key: string): number => typeof reported[key] === "number" && Number.isFinite(reported[key]) ? Math.max(0, Math.round(reported[key])) : 0;
@@ -126,7 +150,7 @@ export function openAIImagesAdapter(
           if (typeof item.revised_prompt === "string") result.output.push({ type: "text", text: item.revised_prompt });
           let bytes: Uint8Array;
           if (typeof item.b64_json === "string") bytes = decodeImageBase64(item.b64_json);
-          else if (typeof item.url === "string") bytes = await downloadGeneratedImage(item.url, signal, {
+          else if (typeof item.url === "string") bytes = await imageSourceBytes(item.url, signal, {
             ...downloadOptions, fetchImpl: downloadOptions.fetchImpl ?? options?.fetch,
           });
           else throw imageError("IMAGE_INVALID_RESPONSE");
@@ -140,6 +164,13 @@ export function openAIImagesAdapter(
       return result;
     },
   };
+}
+
+export function imageSourceBytes(source: string, signal: AbortSignal, downloads: ImageDownloadOptions): Promise<Uint8Array> {
+  if (/^data:image\/(?:png|jpeg|webp);base64,/i.test(source)) {
+    return Promise.resolve(decodeImageBase64(source.slice(source.indexOf(",") + 1)));
+  }
+  return downloadGeneratedImage(source, signal, downloads);
 }
 
 export function decodeImageBase64(data: string): Uint8Array {

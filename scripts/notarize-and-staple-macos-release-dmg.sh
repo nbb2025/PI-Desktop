@@ -13,9 +13,9 @@
 #   The staple and validate action failed! Error 65.
 #
 # Required environment (never echoed, never written to the repo):
-#   APPLE_ID                      Apple ID email in team DUV63RKYTW
+#   APPLE_ID                      Apple ID email for the configured team
 #   APPLE_APP_SPECIFIC_PASSWORD   app-specific password for that Apple ID
-#   APPLE_TEAM_ID                 must be DUV63RKYTW
+#   APPLE_TEAM_ID                 Developer ID team that signs the app
 #
 # Usage: scripts/notarize-and-staple-macos-release-dmg.sh [release-dir]
 
@@ -23,7 +23,6 @@ set -euo pipefail
 
 RELEASE_DIR="${1:-apps/desktop/release}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-EXPECTED_TEAM_ID="DUV63RKYTW"
 # The ticket can take a moment to reach the stapler after Apple accepts, but a
 # retry is only legal once the submission returned Accepted. Overridable so
 # tests do not sleep for real.
@@ -35,8 +34,8 @@ if [[ -z "${APPLE_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" || -z "${APPLE
   exit 1
 fi
 
-if [[ "$APPLE_TEAM_ID" != "$EXPECTED_TEAM_ID" ]]; then
-  echo "error: APPLE_TEAM_ID must be $EXPECTED_TEAM_ID (got: $APPLE_TEAM_ID)." >&2
+if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+  echo "error: Invalid APPLE_TEAM_ID." >&2
   exit 1
 fi
 

@@ -28,7 +28,7 @@ import { ModelSelectionPanes } from "./apps/desktop/src/components/settings/Mode
 import { composerModelsForProvider } from "./apps/desktop/src/lib/composer-models";
 const i18n = createInstance();
 await i18n.init({ lng: "en", resources: { en: { translation: catalogs.en } } });
-const bindings = [{ id: "custom-chat", contextWindow: 128000, maxTokens: 8192, thinkingLevels: [] }];
+const bindings = [{ id: "gpt-image-2", contextWindow: 128000, maxTokens: 8192, thinkingLevels: [] }];
 let selected = [];
 function Fixture() {
   const [images, setImages] = useState([]);

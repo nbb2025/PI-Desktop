@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { ErrorCodes } from "../../../packages/shared/src/errors.ts";
 import { IPC } from "../../../packages/shared/src/protocol.ts";
+import { isIagentProvider } from "../electron/main/iagent/catalog.ts";
 import * as modelsDev from "../electron/main/models-dev-catalog.ts";
 
 /** Minimal CJS loader for the main-process module under test. */
@@ -86,6 +87,7 @@ function harness(realCatalog) {
       },
     },
     "@pi-desktop/agent-runtime": {},
+    "../iagent/catalog": { isIagentProvider },
     "../models-dev-catalog": modelsDev,
     "../host-process": {},
     "../logger": { app: () => {} },

@@ -16,7 +16,7 @@ const stylesSource = await loadStyles();
 test("Composer uses one searchable model menu with a source rail", () => {
   assert.doesNotMatch(composerSource, /ComposerMenuView|composer-menu-back|showView|otherModelsExpanded/);
   assert.match(pickerSource, /<ComposerModelList/);
-  assert.match(pickerSource, /composer-model-menu composer-model-thinking-menu \$\{showSectionRail \? "has-rail" : ""\}/);
+  assert.match(pickerSource, /composer-model-menu composer-model-thinking-menu \$\{showSectionRail \? "has-rail" : ""\}\$\{hasIagent \? " has-iagent" : ""\}/);
   // Every source is one click away: the rail lists recent + each provider,
   // its items are radios, and search spans every source at once.
   assert.match(listSource, /className="composer-model-rail" role="group" aria-label=\{t\("chat\.modelSources"\)\}/);

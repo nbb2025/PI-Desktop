@@ -14,9 +14,7 @@
 # Usage: scripts/macos-signing-diagnostics.sh [--require-identity]
 #
 # Environment:
-#   MAC_SIGNING_IDENTITY   bare common name ("XingYu Liu (DUV63RKYTW)") or the
-#                          full certificate label
-#                          ("Developer ID Application: XingYu Liu (DUV63RKYTW)").
+#   MAC_SIGNING_IDENTITY   optional certificate common name or full label
 #
 # Exit status:
 #   0  snapshot printed. A missing certificate is only a warning by default:
@@ -46,9 +44,8 @@ for arg in "$@"; do
   esac
 done
 
-# Accepts either the bare common name or the full certificate label, matching
-# scripts/verify-macos-release.sh.
-IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-XingYu Liu (DUV63RKYTW)}"
+# With no explicit name, show any local Developer ID Application identity.
+IDENTITY_NAME="${MAC_SIGNING_IDENTITY:-}"
 IDENTITY_NAME="${IDENTITY_NAME#Developer ID Application: }"
 EXPECTED_IDENTITY="Developer ID Application: ${IDENTITY_NAME}"
 

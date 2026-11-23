@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/public/readme/logo.png" alt="PI-Desktop" width="108" />
+<img src="apps/desktop/src/assets/brand/iagent-mark.png" alt="PI-Desktop" width="108" />
 
 # PI-Desktop
 
@@ -12,17 +12,17 @@ Local-first · Model-agnostic · Plugin-powered · macOS / Windows / Linux
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
-[![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
+[![Release](https://img.shields.io/github/v/release/nbb2025/PI-Desktop?label=release)](https://github.com/nbb2025/PI-Desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/nbb2025/PI-Desktop/total?label=downloads)](https://github.com/nbb2025/PI-Desktop/releases)
+[![Stars](https://img.shields.io/github/stars/nbb2025/PI-Desktop?style=flat\&label=stars)](https://github.com/nbb2025/PI-Desktop/stargazers)
+[![CI](https://github.com/nbb2025/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/nbb2025/PI-Desktop/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/nbb2025/PI-Desktop)](LICENSE)
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[Download](https://github.com/nbb2025/PI-Desktop/releases/latest)** ·
+[iAgent](https://ai.iagent.dev/) ·
+[Documentation](docs/index.md) ·
 [Build a Plugin](docs/plugin-development.md) ·
 [Screenshots](docs/guide/screenshots.md) ·
 [简体中文](README.zh-CN.md)
@@ -514,6 +514,12 @@ Execution
 
 ## Get started
 
+Connect iAgent in **Settings → Models** to sync available chat groups and use
+the bundled **imagegen** skill with an authorized iAgent image model. The chat
+model picker shows account group rates, prices, and adjustable thinking
+levels for models matched to the refreshed catalog. See the
+[account and catalog behavior](docs/spec/03-runtime/11-provider-model-system.md#iagent-accounts).
+
 <table>
 <tr>
 
@@ -562,7 +568,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [Download PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [Download PI-Desktop →](https://github.com/nbb2025/PI-Desktop/releases/latest)
 
 **macOS · Windows · Linux**
 
@@ -574,10 +580,10 @@ Agent / Plan / Goal
 | -------- | ------------- | --------------------------------------- |
 | macOS    | Apple Silicon | `.dmg` / `.zip`                         |
 | macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | Installer / `.zip`                      |
+| Windows  | x86 / x64     | NSIS installer (x64 also has ZIP)       |
 | Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
 
-macOS releases are signed with a Developer ID certificate and notarized by Apple.
+Windows installers receive in-app updates. macOS builds with Developer ID signing and notarization receive in-app updates. Manual macOS builds check for new releases and link to the installer.
 
 <details>
 <summary><strong>Linux Compatibility</strong></summary>
@@ -653,7 +659,7 @@ Plugins can be created and loaded directly as Development Plugins.
 #### Start
 
 ```bash
-git clone https://github.com/vastsa/PI-Desktop.git
+git clone https://github.com/nbb2025/PI-Desktop.git
 cd PI-Desktop
 
 pnpm install
@@ -676,7 +682,7 @@ pnpm test
 
 ### Documentation
 
-[Documentation](https://pi-docs.aiuo.net/) ·
+[Documentation](docs/index.md) ·
 [Architecture](docs/spec/02-architecture/01-architecture.md) ·
 [Specification](docs/spec/README.md) ·
 [Plugin Development](docs/plugin-development.md) ·
@@ -698,21 +704,9 @@ For standalone capabilities, consider one question first:
 
 Keep the Core focused. Let the ecosystem grow.
 
-**[Report an Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[Open Issues](https://github.com/vastsa/PI-Desktop/issues) ·
+**[Report an Issue](https://github.com/nbb2025/PI-Desktop/issues/new/choose)** ·
+[Open Issues](https://github.com/nbb2025/PI-Desktop/issues) ·
 [Build a Plugin](docs/plugin-development.md)
-
----
-
-## Project Trend
-
-<div align="center">
-
-<a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
-<img src="https://trendshift.io/api/badge/repositories/178787" alt="PI-Desktop on Trendshift" width="230" height="51" />
-</a>
-
-</div>
 
 ---
 
@@ -738,13 +732,13 @@ Thanks to every human contributor — and every model that helped us build it.
 
 PI-Desktop is licensed under the **GNU Lesser General Public License v3.0**.
 
-See [LICENSE](LICENSE) for details.
+See [LICENSE](LICENSE) for details. This iAgent distribution is based on the PI-Desktop work by vastsa and its contributors.
 
 ---
 
 <div align="center">
 
-<img src="docs/public/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="apps/desktop/src/assets/brand/iagent-mark.png" alt="PI-Desktop" width="72" />
 
 ## PI-Desktop
 
@@ -754,8 +748,8 @@ See [LICENSE](LICENSE) for details.
 
 <br />
 
-**[Download](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[Download](https://github.com/nbb2025/PI-Desktop/releases/latest)** ·
+[Documentation](docs/index.md) ·
 [Build a Plugin](docs/plugin-development.md)
 
 <br /><br />

@@ -1,4 +1,5 @@
 /** Shared public types grouped by the owning application domain. */
+import type { IagentChatPrice } from "./iagent.js";
 export const THINKING_LEVELS = [
   "off",
   "minimal",
@@ -333,6 +334,8 @@ export type ModelInfo = {
   openWeights?: boolean;
   limit?: ModelLimit;
   cost?: ModelCost;
+  /** Group-adjusted prices are separate from the model publisher's costs. */
+  iagentChatPrice?: IagentChatPrice;
   interleaved?: ModelInterleaved;
   status?: string;
   /** Last endpoint-list membership; absence is unknown, not an inference failure. */

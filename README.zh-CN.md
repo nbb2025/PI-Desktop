@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/public/readme/logo.png" alt="PI-Desktop" width="108" />
+<img src="apps/desktop/src/assets/brand/iagent-mark.png" alt="PI-Desktop" width="108" />
 
 # PI-Desktop
 
@@ -12,18 +12,18 @@
 
 <br />
 
-[![Release](https://img.shields.io/github/v/release/vastsa/PI-Desktop?label=release)](https://github.com/vastsa/PI-Desktop/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/vastsa/PI-Desktop/total?label=downloads)](https://github.com/vastsa/PI-Desktop/releases)
-[![Stars](https://img.shields.io/github/stars/vastsa/PI-Desktop?style=flat\&label=stars)](https://github.com/vastsa/PI-Desktop/stargazers)
-[![CI](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/vastsa/PI-Desktop/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/vastsa/PI-Desktop)](LICENSE)
-[![Reddit](https://img.shields.io/badge/Reddit-r%2FAIUO-FF4500?logo=reddit\&logoColor=white)](https://www.reddit.com/r/AIUO/)
-[![QQ 群：点击加入 PI-Desktop 开发者交流群](https://img.shields.io/badge/QQ-%E5%8A%A0%E5%85%A5%E5%BC%80%E5%8F%91%E8%80%85%E4%BA%A4%E6%B5%81%E7%BE%A4-12B7F5?logo=tencentqq&logoColor=white)](https://qm.qq.com/q/iWP8i0XxIc)
+[![Release](https://img.shields.io/github/v/release/nbb2025/PI-Desktop?label=release)](https://github.com/nbb2025/PI-Desktop/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/nbb2025/PI-Desktop/total?label=downloads)](https://github.com/nbb2025/PI-Desktop/releases)
+[![Stars](https://img.shields.io/github/stars/nbb2025/PI-Desktop?style=flat\&label=stars)](https://github.com/nbb2025/PI-Desktop/stargazers)
+[![CI](https://github.com/nbb2025/PI-Desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/nbb2025/PI-Desktop/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/nbb2025/PI-Desktop)](LICENSE)
+QQ 交流群：116098473
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[使用文档](https://pi-docs.aiuo.net/) ·
+**[立即下载](https://github.com/nbb2025/PI-Desktop/releases/latest)** ·
+[iAgent 官网](https://ai.iagent.dev/) ·
+[使用文档](docs/zh-CN/index.md) ·
 [插件开发](docs/plugin-development.md) ·
 [界面预览](docs/guide/screenshots.md) ·
 [English](README.md)
@@ -563,7 +563,7 @@ Agent / Plan / Goal
 
 <div align="center">
 
-### [下载 PI-Desktop →](https://github.com/vastsa/PI-Desktop/releases/latest)
+### [下载 PI-Desktop →](https://github.com/nbb2025/PI-Desktop/releases/latest)
 
 **macOS · Windows · Linux**
 
@@ -575,10 +575,10 @@ Agent / Plan / Goal
 | -------- | ------------- | --------------------------------------- |
 | macOS    | Apple Silicon | `.dmg` / `.zip`                         |
 | macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x64           | 安装程序 / `.zip`                       |
+| Windows | x86 / x64 | NSIS 安装包（x64 也提供 ZIP） |
 | Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
 
-macOS Release 使用 Developer ID 签名并经过 Apple Notarization。
+macOS 在配置 Developer ID 和 Apple 公证后支持应用内安装更新。手动安装版可在应用内检查更新并打开下载页。
 
 <details>
 <summary><strong>Linux Compatibility</strong></summary>
@@ -654,7 +654,7 @@ PI-Desktop 也可以作为开发者构建 Agent 产品的宿主平台。
 #### Start
 
 ```bash
-git clone https://github.com/vastsa/PI-Desktop.git
+git clone https://github.com/nbb2025/PI-Desktop.git
 cd PI-Desktop
 
 pnpm install
@@ -677,7 +677,7 @@ pnpm test
 
 ### 文档
 
-[Documentation](https://pi-docs.aiuo.net/) ·
+[Documentation](docs/index.md) ·
 [Architecture](docs/spec/02-architecture/01-architecture.md) ·
 [Specification](docs/spec/README.md) ·
 [Plugin Development](docs/plugin-development.md) ·
@@ -699,21 +699,9 @@ pnpm test
 
 让 Core 保持克制，让生态持续生长。
 
-**[提交 Issue](https://github.com/vastsa/PI-Desktop/issues/new/choose)** ·
-[查看 Issues](https://github.com/vastsa/PI-Desktop/issues) ·
+**[提交 Issue](https://github.com/nbb2025/PI-Desktop/issues/new/choose)** ·
+[查看 Issues](https://github.com/nbb2025/PI-Desktop/issues) ·
 [开发插件](docs/plugin-development.md)
-
----
-
-## 项目趋势
-
-<div align="center">
-
-<a href="https://trendshift.io/repositories/178787?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-178787">
-<img src="https://trendshift.io/api/badge/repositories/178787" alt="PI-Desktop on Trendshift" width="230" height="51" />
-</a>
-
-</div>
 
 ---
 
@@ -745,7 +733,7 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <div align="center">
 
-<img src="docs/public/readme/logo.png" alt="PI-Desktop" width="72" />
+<img src="apps/desktop/src/assets/brand/iagent-mark.png" alt="PI-Desktop" width="72" />
 
 ## PI-Desktop
 
@@ -755,8 +743,8 @@ PI-Desktop 使用 **GNU Lesser General Public License v3.0**。
 
 <br />
 
-**[立即下载](https://github.com/vastsa/PI-Desktop/releases/latest)** ·
-[Documentation](https://pi-docs.aiuo.net/) ·
+**[立即下载](https://github.com/nbb2025/PI-Desktop/releases/latest)** ·
+[Documentation](docs/index.md) ·
 [Build a Plugin](docs/plugin-development.md)
 
 <br /><br />

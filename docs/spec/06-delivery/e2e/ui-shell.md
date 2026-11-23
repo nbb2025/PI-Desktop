@@ -598,10 +598,8 @@
   Windows/Linux render the canonical 20px logo beside the 15px shell name; the
   complete brand has a localized Home accessible name, visible hover/focus
   feedback, and returns the main pane to chat without clearing the active
-  conversation or workspace. The logo itself is theme-aware: light mode shows
-  `src/assets/brand/logo-light.png`,
-  dark mode shows `src/assets/brand/logo-dark.png`, swapping live with
-  `data-theme` (no reload).
+  conversation or workspace. The iAgent website mark is visible in both
+  themes.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`
 - **Acceptance**: Quality
@@ -875,28 +873,21 @@
 - **Acceptance**: A (app startup), Quality
 - **Milestone**: M5
 
-## E2E-099: Brand logo follows the active theme
+## E2E-099: iAgent brand logo is visible across themes
 - **Status**: Draft
 - **Priority**: P3
 - **Covers**: Quality / US-UI shell polish
 - **Preconditions**: App running; theme can switch between light and dark (and system) without restart.
 - **Steps**:
   1. In light mode, open the app shell, an empty chat home, and the expanded sidebar (Windows/Linux) or startup splash.
-  2. Inspect the rendered `BrandLogo` source in the sidebar and startup splash,
-     and inspect the light eight-frame `HomeMascotLogo` GIF in the empty-home
-     hero. Hover the mascot and verify that its cadence does not change.
+  2. Inspect the rendered `BrandLogo` in the sidebar, startup splash,
+     and empty-home hero.
   3. Switch the theme to dark (Settings → Appearance → Interface, or system appearance change).
   4. Re-inspect the same surfaces without reloading.
   5. Switch back to light and re-inspect.
 - **Expected**:
-  - Light and dark mode render `src/assets/brand/logo-light.png` /
-    `src/assets/brand/logo-dark.png`
-    live in the sidebar and startup splash without a window reload.
-  - The empty-home hero renders the 100px eight-frame mascot GIF for the
-    active theme (`home-mascot-light.gif` / `home-mascot-dark.gif`) with a
-    short idle hold and a looping wave. Switching theme swaps the pair live
-    without a window reload. Pointer hover does not change the cadence;
-    under reduced motion the matching still first frame remains visible.
+  - Light and dark mode render the iAgent website mark in the sidebar,
+    startup splash and empty-home hero.
   - Sizes stay stable across theme changes (sidebar 20px, hero 100px, splash
     64px), and the marks stay decorative with no click, keyboard, or focus
     behavior.
@@ -1307,11 +1298,8 @@
   row, with no Logo/Home brand or back/forward buttons.
 
 ## US-UI-17 PI-Desktop home hero logo
-- On empty chat home, the 100px `HomeMascotLogo` GIF renders above the title
-  as an eight-frame waving mascot with a short idle hold. Light and dark
-  themes each use a dedicated GIF and still PNG.
-- Pointer hover does not change the cadence or geometry; reduced motion shows
-  the matching still first frame. The mascot remains decorative.
+- On empty chat home, the 100px iAgent website mark renders above the title
+  as a decorative image in both themes.
 - Title is 28px / weight 400; active project name uses dotted underline (1px, offset 4px).
 - Composer does not render attachment or appshot controls before their payload
   reaches pi end to end.
