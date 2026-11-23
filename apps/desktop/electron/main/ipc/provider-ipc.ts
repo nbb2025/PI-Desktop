@@ -117,6 +117,7 @@ export function registerProviderIpc({
   });
   handle(IPC.invoke.providersRefreshModelCatalog, async () => {
     const refreshed = await modelsDevCatalog.refresh();
+    if (refreshed) await iagent?.reapplyMetadata();
     return { refreshed, status: modelsDevCatalog.getStatus() };
   });
   // Status only: the snapshot is bundled with the release and this reports what
@@ -355,23 +356,7 @@ export function registerProviderIpc({
       if (!host) throw new Error("host unavailable");
       const req = typeof input === "string" ? { providerId: input } : input ?? {};
       if (req.providerId && isIagentProvider(req.providerId) && iagent) {
-        const provider = iagent.providers().find((row) => row.id === req.providerId);
-        if (!provider) return { models: [], source: "catalog" };
-        await modelsDevCatalog.ensureLoaded();
-        const models = iagent.modelChoices(provider.id).map((choice) => {
-          const published = modelsDevCatalog.findModel({
-            providerId: provider.id, vendorKey: provider.vendorKey,
-            baseUrl: provider.baseUrl, modelId: choice.modelId,
-          });
-          if (!published) return choice;
-          const info = modelInfoFromModelsDev(published, provider.id);
-          return {
-            ...info, modelId: choice.modelId, displayName: choice.displayName,
-            contextWindow: choice.contextWindow ?? info.contextWindow,
-            maxTokens: choice.maxTokens ?? info.maxTokens, discoveryState: "published",
-          };
-        });
-        return { models, source: "catalog" };
+        return { models: iagent.modelChoices(req.providerId), source: "catalog" };
       }
       const providers = req.source === "cache"
         ? (await host.call<{ providers: RuntimeProvider[] }>("providers.list", {

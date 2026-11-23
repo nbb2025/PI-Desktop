@@ -692,6 +692,24 @@ successful membership read removes revoked groups even if the site catalog
 cannot be read. Launches verify the selected group and model and ask the user
 to reselect when a pinned model disappears.
 
+The Composer gives iAgent sources a wider, wrapping group rail. It shows
+the signed-in account's group multiplier and the selected group's standard
+input/output rates per million tokens or per-request rate. Authenticated
+model-plaza pricing takes precedence. Public channel overrides and site
+default prices are marked as estimates when the model plaza has no match.
+Quotes use the authorized group's rate, including a per-user override.
+Additional context tiers are listed in the price tooltip. Unknown prices
+remain unavailable, and pricing requests do not block chat dispatch.
+
+Managed bindings use the models.dev match for the served model's reasoning
+levels, modalities, and limits when the site omits its limits. An iAgent
+account enables a credential-free metadata refresh in the background at
+sign-in or startup, then every six hours with a ten-minute retry on failure.
+The app reapplies successful metadata and keeps the last available snapshot
+on failure. Only matched reasoning models expose a thinking slider, and
+the default leaves the reasoning override unset until the user selects a
+level. Model matching does not change the served model ID.
+
 Chat and image generation acquire scoped workspace keys at dispatch.
 The first use searches the complete account inventory for the existing
 `聊天` or `创意工坊` key before creating one. Its binding or an unclear

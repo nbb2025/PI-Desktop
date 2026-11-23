@@ -353,6 +353,13 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    iagentGroupRate: "Çarpan ×{{rate}}",
+    iagentTokenPrice: "Girdi {{input}} · Çıktı {{output}} / 1 M token",
+    iagentPricePerRequest: "{{price}} / istek",
+    iagentPriceUnavailable: "Grup fiyatı mevcut değil",
+    iagentPriceReference: "Tahmini",
+    iagentPriceStandard: "Standart grup fiyatı",
+    iagentPriceTiered: "Kademeli",
     promptRetractionFailed: "Taslak güvenli biçimde geri yüklenemedi. Konuşmanız korundu.",
     tableActions: "Tablo işlemleri",
     markdownPlainTextFallback: "Büyük yanıtlar arayüzün duyarlı kalması için düz metin olarak gösterilir.",

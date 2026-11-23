@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { setImmediate as settled } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import { createIagentIntegration } from "../electron/main/iagent/integration.ts";
+import { ModelsDevCatalog } from "../electron/main/models-dev-catalog.ts";
 
 const group = (id, name, platform, options = {}) => ({ id, name, platform, status: "active", ...options });
 const model = (group_id, id) => ({ group_id, id });
@@ -16,6 +19,9 @@ function fixture() {
   let pageFailure = false;
   let createFailure = false;
   let rejectRefresh = false;
+  let rates = {};
+  let plaza = null;
+  let channels = [];
   let groups = [
     group(2, "ChatGPT", "openai"), group(1, "Claude", "anthropic"), group(3, "Mixed", "grok"),
     group(4, "GPT Image", "openai"), group(5, "Wan", "bailian"), group(6, "Video", "video-lt"),
@@ -37,7 +43,7 @@ function fixture() {
   const changes = [];
   const calls = [];
   let keyRequests = 0;
-  const makeIntegration = () => createIagentIntegration({
+  const makeIntegration = (options = {}) => createIagentIntegration({
     now: () => now,
     language: () => "zh-CN",
     onChange: (update) => changes.push(update),
@@ -67,7 +73,14 @@ function fixture() {
         assert.equal(new Headers(init.headers).has("authorization"), false);
         return catalogFailure ? new Response(null, { status: 503 }) : Response.json(catalog);
       }
+      if (url.pathname === "/site-api/channels") {
+        assert.equal(new Headers(init.headers).has("authorization"), false);
+        return Response.json(channels);
+      }
       assert.equal(new Headers(init.headers).get("authorization"), "Bearer login-fixture");
+      if (url.pathname === "/api/v1/groups/rates") return ok(rates);
+      if (url.pathname === "/api/v1/model-plaza")
+        return plaza ? ok(plaza) : new Response(null, { status: 404 });
       if (url.pathname === "/api/v1/groups/available")
         return groupFailure ? new Response(null, { status: 503 }) : ok(groups);
       if (url.pathname === "/api/v1/keys" && init.method === "GET") {
@@ -92,17 +105,114 @@ function fixture() {
       }
       assert.fail(`Unexpected iAgent request ${url.pathname}`);
     },
+    ...options,
   });
   return {
     makeIntegration, setTwoFactor: () => { twoFactor = true; },
     setUser: (id) => { signedInUser = id; }, advance: (ms = 61_000) => { now += ms; },
     setGroups: (next) => { groups = next; }, setCatalog: (next) => { catalog = next; },
+    setPrices: (next) => { ({ rates = {}, plaza = null, channels = [] } = next); },
     failCatalog: (failed) => { catalogFailure = failed; }, failGroups: (failed) => { groupFailure = failed; },
     failPage: (failed) => { pageFailure = failed; }, failCreate: (failed) => { createFailure = failed; },
     failRefresh: () => { rejectRefresh = true; },
     changes, calls, pages, existing, keyRequests: () => keyRequests,
   };
 }
+
+test("a refreshed models.dev match updates the exact managed model and its thinking ladder", async () => {
+  const mock = fixture();
+  const id = "gpt-6-refresh-fixture";
+  mock.setCatalog({ models: [model(2, id), model(2, id + "-thinking")] });
+  let catalogFetches = 0;
+  let online = false;
+  const modelsDevCatalog = new ModelsDevCatalog({
+    catalogPath: fileURLToPath(new URL("../resources/models.dev/api.json", import.meta.url)),
+    fetchImpl: async (url, init) => {
+      assert.equal(url, "https://models.dev/api.json");
+      assert.equal(new Headers(init.headers).has("authorization"), false);
+      catalogFetches++;
+      return online ? Response.json({ openai: {
+        id: "openai", name: "OpenAI", api: "https://api.openai.com/v1",
+        models: { [id]: {
+          id, name: "A new model", reasoning: true,
+          reasoning_options: [{ type: "effort", values: ["low", "medium", "high"] }],
+          limit: { context: 400_000, output: 32_000 },
+        } },
+      } }) : new Response(null, { status: 503 });
+    },
+  });
+  const integration = mock.makeIntegration({ modelsDevCatalog });
+  await integration.refresh();
+  assert.equal(catalogFetches, 0);
+  await integration.login({ email: "desktop@example.test", password: "fake-password" });
+  await settled();
+  assert.equal(catalogFetches, 1);
+  assert.deepEqual(integration.providers()[0].models.find((entry) => entry.id === id).thinkingLevels, ["off"]);
+  online = true;
+  const beforeMetadata = mock.changes.length;
+  mock.advance(11 * 60_000);
+  await integration.refresh();
+  await settled();
+  assert.equal(catalogFetches, 2);
+  const match = integration.modelChoices("iagent:41:2").find((entry) => entry.modelId === id);
+  assert.equal(match.catalogSource, "models.dev");
+  assert.equal(match.contextWindow, 400_000);
+  const bindings = integration.providers()[0].models;
+  assert.deepEqual(bindings.find((entry) => entry.id === id).thinkingLevels, ["low", "medium", "high"]);
+  assert.deepEqual(bindings.find((entry) => entry.id === id + "-thinking").thinkingLevels, ["off"]);
+  assert.ok(mock.changes.slice(beforeMetadata).some(({ catalogChanged }) => catalogChanged));
+  mock.advance();
+  await integration.refresh();
+  await settled();
+  assert.equal(catalogFetches, 2, "a group sync reuses an already fresh metadata snapshot");
+});
+
+test("chat prices follow group and user rates, channel overrides and backend quotes", async () => {
+  const mock = fixture();
+  mock.setGroups([
+    group(1, "Claude A", "anthropic", { rate_multiplier: 1.2 }),
+    group(2, "Claude B", "anthropic", { rate_multiplier: 0.9 }),
+  ]);
+  const default_pricing = { found: true, input_price: 0.00001, output_price: 0.00005 };
+  mock.setCatalog({ price_unit: "USD/token", models: [
+    { ...model(1, "claude-fable-5"), default_pricing },
+    { ...model(2, "claude-fable-5"), default_pricing },
+  ] });
+  mock.setPrices({
+    rates: { 2: 0.5 },
+    channels: [{ platforms: [{
+      platform: "claude", groups: [{ id: 1 }, { id: 2 }],
+      supported_models: [{
+        id: "claude-fable-5", group_ids: [2],
+        pricing: { billing_mode: "token", input_price: 0.000012, output_price: 0.00006 },
+      }],
+    }] }],
+  });
+  const integration = mock.makeIntegration();
+  await integration.login({ email: "desktop@example.test", password: "fake-password" });
+  await settled();
+  const price = (id) => integration.modelChoices(`iagent:41:${id}`)[0].iagentChatPrice;
+  assert.equal(integration.providers().find((row) => row.id === "iagent:41:2").iagentRate, 0.5);
+  assert.deepEqual(price(1).tiers, [{ input: 12, output: 60 }]);
+  assert.deepEqual(price(2).tiers, [{ input: 6, output: 30 }]);
+  assert.equal(price(2).source, "reference");
+  mock.setPrices({
+    plaza: { groups: [{
+      id: 2, platform: "anthropic", rate_multiplier: 0.9, user_rate_multiplier: 0,
+      models: [{ name: "claude-fable-5", platform: "anthropic", pricing: {
+        billing_mode: "token", input_price: 0.00001, output_price: 0.00005,
+      } }],
+    }] },
+  });
+  const beforePrices = mock.changes.length;
+  mock.advance();
+  await integration.refresh();
+  await settled();
+  assert.equal(price(2).source, "effective");
+  assert.deepEqual(price(2).tiers, [{ input: 0, output: 0 }]);
+  assert.ok(mock.changes.slice(beforePrices).some(({ catalogChanged }) => catalogChanged), "price-only changes reload the picker");
+  assert.equal(mock.keyRequests(), 0);
+});
 
 test("guest browsing, account login and model projection follow iAgent's catalog", async () => {
   const mock = fixture();

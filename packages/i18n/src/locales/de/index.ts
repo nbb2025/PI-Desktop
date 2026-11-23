@@ -344,6 +344,13 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    iagentGroupRate: "Faktor ×{{rate}}",
+    iagentTokenPrice: "Eingabe {{input}} · Ausgabe {{output}} / 1 Mio. Token",
+    iagentPricePerRequest: "{{price}} / Anfrage",
+    iagentPriceUnavailable: "Gruppenpreis nicht verfügbar",
+    iagentPriceReference: "Richtwert",
+    iagentPriceStandard: "Standardpreis der Gruppe",
+    iagentPriceTiered: "Preisstaffel",
     fileLineReferenceLimit: "Pro Nachricht sind bis zu {{count}} Verweise auf Dateizeilen möglich.",
     promptRetractionFailed: "Der Entwurf konnte nicht sicher wiederhergestellt werden. Der Gesprächsverlauf bleibt erhalten.",
     "tableActions": "Tabellenaktionen",

@@ -344,6 +344,13 @@ export const es = {
     sessionMissing: "Esa sesión ya no existe",
   },
   "chat": {
+    iagentGroupRate: "Factor ×{{rate}}",
+    iagentTokenPrice: "Entrada {{input}} · Salida {{output}} / 1 M de tokens",
+    iagentPricePerRequest: "{{price}} / solicitud",
+    iagentPriceUnavailable: "Precio del grupo no disponible",
+    iagentPriceReference: "Estimación",
+    iagentPriceStandard: "Precio estándar del grupo",
+    iagentPriceTiered: "Por tramos",
     fileLineReferenceLimit: "Puedes añadir hasta {{count}} referencias a líneas de archivo por mensaje.",
     promptRetractionFailed: "No se pudo restaurar el borrador de forma segura. Se ha conservado la conversación.",
     "tableActions": "Acciones de tabla",

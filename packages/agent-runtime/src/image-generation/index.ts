@@ -4,6 +4,7 @@ import { IMAGE_GENERATION_TIMEOUT_MS, imageGenerationItems, type GeneratedImageR
 import { boundedBytes, generatedImageType, imageError, MAX_IMAGE_BYTES, type ImageDownloadOptions } from "./download.js";
 import { decodeImageBase64, safeImageError } from "./openai-images.js";
 import { createImageBinding, type ImageBinding, type ImageEndpoint } from "./binding.js";
+import { IAGENT_IMAGE_TIMEOUT_MS } from "./iagent-tasks.js";
 export { generatedImageType, MAX_IMAGE_BYTES } from "./download.js";
 export { createImageBinding, type ImageBinding, type ImageEndpoint } from "./binding.js";
 
@@ -41,6 +42,7 @@ export async function generateImageBatch(options: {
   const binding = options.binding ?? (options.endpoint && createImageBinding(options.endpoint, options.downloadOptions));
   if (!binding) throw imageError("IMAGE_MODEL_UNAVAILABLE");
   const results: GeneratedImageResult[][] = Array.from({ length: prompts.length }, () => []);
+  const timeoutMs = binding.iagentProtocol ? IAGENT_IMAGE_TIMEOUT_MS : IMAGE_GENERATION_TIMEOUT_MS;
   let next = 0;
   let authFailed = false;
   const worker = async () => {
@@ -53,7 +55,7 @@ export async function generateImageBatch(options: {
       }
       const controller = new AbortController();
       const signal = AbortSignal.any([options.signal, controller.signal]);
-      const timer = setTimeout(() => controller.abort(), IMAGE_GENERATION_TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
       let transportError: string | undefined;
       try {
         const item = prompts[index];
@@ -66,12 +68,16 @@ export async function generateImageBatch(options: {
             type: "image" as const, data: Buffer.from(image.bytes).toString("base64"), mimeType: image.mimeType,
           }))],
         }, {
-          signal, maxRetries: 0, timeoutMs: IMAGE_GENERATION_TIMEOUT_MS,
+          signal, maxRetries: 0, timeoutMs,
           // Host request policy, not a competing implementation of the native wire protocol.
           fetch: async (url, init) => {
             try {
               signal.throwIfAborted();
-              const response = await (options.fetchImpl ?? fetch)(url, { ...init, signal, redirect: "error" });
+              const requestSignal = init?.signal ? AbortSignal.any([signal, init.signal]) : signal;
+              const response = await (options.fetchImpl ?? fetch)(url, { ...init, signal: requestSignal, redirect: "error" });
+              // The iAgent adapter classifies HTTP states for task submission
+              // and polls and bounds each body at its own protocol limit.
+              if (binding.iagentProtocol) return response;
               if (!response.ok) {
                 transportError = response.status === 401 || response.status === 403 ? "IMAGE_AUTH_FAILED" : `IMAGE_HTTP_${response.status}`;
                 await response.body?.cancel();
@@ -113,8 +119,8 @@ export async function generateImageBatch(options: {
           }
         }
         if (result.stopReason !== "stop")
-          throw imageError(result.stopReason === "aborted" ? "IMAGE_CANCELLED" : transportError ??
-            (/^IMAGE_[A-Z0-9_]+$/.test(result.errorMessage ?? "") ? result.errorMessage! : "IMAGE_REQUEST_FAILED"));
+          throw imageError(result.stopReason === "aborted" ? "IMAGE_CANCELLED" :
+            (/^IMAGE_[A-Z0-9_]+$/.test(result.errorMessage ?? "") ? result.errorMessage! : transportError ?? "IMAGE_REQUEST_FAILED"));
         if (!output.length) throw imageError("IMAGE_INVALID_RESPONSE");
       } catch (error) {
         const code = options.signal.aborted ? "IMAGE_CANCELLED" : controller.signal.aborted ? "IMAGE_TIMEOUT" : safeImageError(error);

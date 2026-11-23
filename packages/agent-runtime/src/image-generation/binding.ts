@@ -23,7 +23,10 @@ export type ImageEndpoint = {
   /** Effective typed model from the host's shared Pi account registry. */
   nativeModel?: ImageModel<ImageApi>;
 };
-export type ImageBinding = { models: Models; model: ImageModel<ImageApi>; accountId?: string };
+export type ImageBinding = {
+  models: Models; model: ImageModel<ImageApi>; accountId?: string;
+  iagentProtocol?: ImageEndpoint["iagentProtocol"];
+};
 
 /**
  * Whether this endpoint is a signed-in Codex (ChatGPT) account.
@@ -73,10 +76,11 @@ export function createImageBinding(endpoint: ImageEndpoint, downloads: ImageDown
   }, {
     models: [model],
     images: {
-      [model.api]: endpoint.iagentProtocol === "gemini" ? iagentGeminiImages : native
+      [model.api]: endpoint.iagentProtocol === "gemini" ? iagentGeminiImages(downloads) : native
         ? openrouterImages
-        : openAIImagesAdapter(downloads, endpoint.iagentProtocol === "grok" ? "iagent-grok" : codexImages ? "codex-json" : "multipart"),
+        : openAIImagesAdapter(downloads, endpoint.iagentProtocol === "grok" ? "iagent-grok"
+          : endpoint.iagentProtocol === "openai" ? "iagent-openai" : codexImages ? "codex-json" : "multipart"),
     },
   });
-  return { models, model, accountId: endpoint.providerId };
+  return { models, model, accountId: endpoint.providerId, iagentProtocol: endpoint.iagentProtocol };
 }

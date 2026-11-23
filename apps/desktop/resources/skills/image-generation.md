@@ -44,6 +44,9 @@ Generation may incur cost. Do not retry failed or timed-out items automatically,
 including after cancellation: the provider may already have processed them.
 Report partial success and wait for a user request before retrying. If the tool
 reports no available image model, direct the user to Settings → Models.
+For iAgent, a query interruption or unknown submission outcome means the
+gateway may still be processing the task. Explain that outcome and avoid
+dispatching another image request as a fallback.
 
 ## Deliver the result
 

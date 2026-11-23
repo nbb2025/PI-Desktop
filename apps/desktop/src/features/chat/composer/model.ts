@@ -8,6 +8,7 @@ import type {
   ThinkingLevel,
 } from "@pi-desktop/shared";
 import {
+  iagentThinkingLevel,
   isSessionThinkingLevel,
   PERMISSION_MODES,
   sessionThinkingMenuLevels,
@@ -94,9 +95,10 @@ export function thinkingLevelForProvider(
 ): SessionThinkingLevel {
   const available = providerThinkingLevels(provider);
   if (!provider?.supportsReasoning) return "off";
-  if (current === "omit") return "omit";
-  if (available.includes(current)) return current;
-  const requestedIndex = THINKING_LEVELS.indexOf(current);
+  const requested = provider.managedBy === "iagent" ? iagentThinkingLevel(current, available) : current;
+  if (requested === "omit") return "omit";
+  if (available.includes(requested)) return requested;
+  const requestedIndex = THINKING_LEVELS.indexOf(requested);
   for (let index = requestedIndex; index < THINKING_LEVELS.length; index += 1) {
     const candidate = THINKING_LEVELS[index];
     if (available.includes(candidate)) return candidate;

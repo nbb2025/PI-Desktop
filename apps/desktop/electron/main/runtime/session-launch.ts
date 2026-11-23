@@ -14,6 +14,7 @@ import {
 import {
   type CommandShellCatalog,
   GEN_UI_DIRECTORY_NAME,
+  iagentThinkingLevel,
   imageGenerationBindings,
   isActiveInProject,
   isCommandShellCatalog,
@@ -501,13 +502,15 @@ export function createSessionLaunchRuntime({
       });
     }
     const thinkingCapabilities = capabilitiesFromModelConfig(modelConfig);
+    const requestedThinkingLevel = normalizeThinkingLevel(
+      overrides.thinkingLevel ??
+      (provider.id === requestedProviderId ? session.thinkingLevel : undefined) ??
+      storedModel?.defaultThinkingLevel,
+    );
     const thinkingLevel = clampThinkingLevel(
       thinkingCapabilities,
-      normalizeThinkingLevel(
-        overrides.thinkingLevel ??
-          (provider.id === requestedProviderId ? session.thinkingLevel : undefined) ??
-          storedModel?.defaultThinkingLevel,
-      ),
+      isManaged ? iagentThinkingLevel(requestedThinkingLevel, thinkingCapabilities.supportedThinkingLevels)
+        : requestedThinkingLevel,
     );
     const projectPath =
       typeof session.projectPath === "string" && session.projectPath.trim()

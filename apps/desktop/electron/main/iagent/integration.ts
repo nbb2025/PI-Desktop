@@ -1,14 +1,18 @@
 import {
   ErrorCodes, IAGENT_ORIGIN, type IagentLoginResult, type IagentStatus, type IagentUpdate,
 } from "@pi-desktop/shared";
+import { modelInfoFromModelsDev, type ModelsDevCatalog } from "../models-dev-catalog.ts";
 import { IagentAccount, type IagentHostCall, type IagentSession } from "./account.ts";
 import {
   type IagentCatalog, type IagentGroup, type IagentImageModel, isIagentProvider, parseIagentCatalog, parseIagentGroups, projectIagentCatalog,
 } from "./catalog.ts";
+import { indexIagentPrices, type IagentPrices } from "./pricing.ts";
 import { createIagentWorkspaceKeys } from "./workspace-keys.ts";
 
 const refreshInterval = 60_000;
 const accessAge = 30_000;
+const metadataInterval = 6 * 60 * 60_000;
+const metadataRetryInterval = 10 * 60_000;
 const nowDefault = Date.now;
 type Projection = ReturnType<typeof projectIagentCatalog>;
 type Snapshot = {
@@ -38,6 +42,8 @@ export function createIagentIntegration(options: {
   fetchImpl?: typeof fetch;
   now?: () => number;
   onChange?: (update: IagentUpdate) => void;
+  onBackgroundError?: (area: "metadata" | "pricing") => void;
+  modelsDevCatalog?: Pick<ModelsDevCatalog, "ensureLoaded" | "findModel" | "refresh">;
 }) {
   const now = options.now ?? nowDefault;
   const account = new IagentAccount(options);
@@ -45,6 +51,8 @@ export function createIagentIntegration(options: {
   let snapshot: Snapshot | undefined;
   let pending: { session: IagentSession; promise: Promise<void> } | undefined;
   let attemptedAt = -Infinity;
+  let nextMetadataAt = -Infinity;
+  let pricing: { session: IagentSession; attemptedAt: number; data?: IagentPrices; pending?: Promise<void> } | undefined;
   let catalogVersion = "";
 
   function publicStatus(session: IagentSession | undefined): IagentStatus {
@@ -59,12 +67,61 @@ export function createIagentIntegration(options: {
     };
   }
 
-  function publish(session: IagentSession | undefined) {
+  function publish(session: IagentSession | undefined, onlyIfChanged = false) {
     const projection = snapshot?.session === session && !session?.expired ? snapshot?.projection : undefined;
-    const updated = JSON.stringify(projection?.providers.map(({ id, name, models, apiStyle }) => ({ id, name, models, apiStyle })) ?? []);
+    const updated = JSON.stringify(projection?.providers.map(({ id, name, models, apiStyle, iagentRate }) => ({
+      id, name, models, apiStyle, iagentRate, choices: projection.models.get(id),
+    })) ?? []);
     const catalogChanged = updated !== catalogVersion;
     catalogVersion = updated;
-    options.onChange?.({ status: publicStatus(session), catalogChanged });
+    if (catalogChanged || !onlyIfChanged) options.onChange?.({ status: publicStatus(session), catalogChanged });
+  }
+
+  function project(session: IagentSession, groups: IagentGroup[], catalog: IagentCatalog) {
+    return projectIagentCatalog(session.user.id, groups, catalog, now(), (provider, modelId) => {
+      const published = options.modelsDevCatalog?.findModel({
+        providerId: provider.id, vendorKey: provider.vendorKey, baseUrl: provider.baseUrl, modelId,
+      });
+      return published && modelInfoFromModelsDev(published, provider.id);
+    }, pricing?.session === session ? pricing.data : undefined);
+  }
+
+  function reproject(session: IagentSession | undefined) {
+    if (!session || snapshot?.session !== session) return;
+    if (!session.expired) snapshot.projection = project(session, snapshot.groups, snapshot.catalog);
+    publish(session, !session.expired);
+  }
+
+  async function refreshMetadata() {
+    const metadata = options.modelsDevCatalog;
+    if (!metadata || now() < nextMetadataAt) return;
+    nextMetadataAt = now() + metadataRetryInterval;
+    await metadata.ensureLoaded();
+    const refreshed = await metadata.refresh();
+    if (refreshed) nextMetadataAt = now() + metadataInterval;
+    else options.onBackgroundError?.("metadata");
+    if (refreshed) reproject(await account.session());
+  }
+
+  function refreshPricing(session: IagentSession, force: boolean) {
+    if (pricing?.session === session && (pricing.pending || !force && now() - pricing.attemptedAt < refreshInterval)) return;
+    const request: NonNullable<typeof pricing> = {
+      session, attemptedAt: now(), data: pricing?.session === session ? pricing.data : undefined,
+    };
+    pricing = request;
+    request.pending = Promise.allSettled([
+      account.authenticated<unknown>(session, "/api/v1/groups/rates"),
+      account.authenticated<unknown>(session, "/api/v1/model-plaza"),
+      account.publicChannels(force),
+    ]).then(async ([rates, plaza, channels]) => {
+      if (pricing !== request || await account.session() !== session || pricing !== request) return;
+      request.data = indexIagentPrices(
+        rates.status === "fulfilled" ? rates.value : undefined,
+        plaza.status === "fulfilled" ? plaza.value : undefined,
+        channels.status === "fulfilled" ? channels.value : undefined,
+      );
+      reproject(session);
+    }).catch(() => options.onBackgroundError?.("pricing")).finally(() => { request.pending = undefined; });
   }
 
   async function load(session: IagentSession, force: boolean) {
@@ -72,6 +129,7 @@ export function createIagentIntegration(options: {
     const [membership, published] = await Promise.allSettled([
       account.authenticated<unknown>(session, "/api/v1/groups/available").then(parseIagentGroups),
       account.catalog(force).then(parseIagentCatalog),
+      options.modelsDevCatalog?.ensureLoaded(),
     ]);
     const current = await account.session();
     if (current !== session) return;
@@ -88,7 +146,7 @@ export function createIagentIntegration(options: {
     const stale = membership.status !== "fulfilled" || published.status !== "fulfilled";
     snapshot = {
       session, groups, catalog, stale,
-      projection: projectIagentCatalog(session.user.id, groups, catalog, now()),
+      projection: project(session, groups, catalog),
       accessAt: membership.status === "fulfilled" ? now() : old?.accessAt ?? -Infinity,
       syncedAt: stale ? old?.syncedAt : now(),
     };
@@ -98,6 +156,8 @@ export function createIagentIntegration(options: {
   async function refresh(force = false, forDispatch = false): Promise<IagentStatus> {
     const session = await account.session();
     if (!session || session.expired) return publicStatus(session);
+    void refreshMetadata().catch(() => options.onBackgroundError?.("metadata"));
+    refreshPricing(session, force);
     if (force) keys.clear();
     if (pending?.session === session) await pending.promise;
     else if (force || !snapshot || snapshot.session !== session ||
@@ -127,6 +187,7 @@ export function createIagentIntegration(options: {
 
   return {
     async status() { return publicStatus(await account.session()); },
+    async reapplyMetadata() { reproject(await account.session()); },
     refresh,
     async login(input: { email?: unknown; password?: unknown } | undefined): Promise<IagentLoginResult> {
       const result = await account.login(input?.email, input?.password);
@@ -139,6 +200,7 @@ export function createIagentIntegration(options: {
     async logout() {
       await account.logout();
       snapshot = undefined;
+      pricing = undefined;
       keys.clear();
       publish(undefined);
       return publicStatus(undefined);
@@ -160,17 +222,7 @@ export function createIagentIntegration(options: {
       return { provider: latest, modelId: model.id, value };
     },
     modelChoices(providerId: string) {
-      const provider = snapshot?.projection.providers.find(({ id }) => id === providerId);
-      if (!provider || snapshot?.session.expired) return [];
-      return provider.models.map((binding) => ({
-        modelId: binding.id,
-        displayName: binding.alias || binding.id,
-        providerId,
-        contextWindow: binding.contextWindow || undefined,
-        maxTokens: binding.maxTokens || undefined,
-        capabilities: ["text" as const],
-        discoveryState: "published" as const,
-      }));
+      return !snapshot?.session.expired ? snapshot?.projection.models.get(providerId) ?? [] : [];
     },
     async imageEndpoint(edit: boolean) {
       const current = await forDispatch();

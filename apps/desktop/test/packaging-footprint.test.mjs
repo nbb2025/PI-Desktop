@@ -70,8 +70,7 @@ test("renderer output keeps its size controls", async () => {
     new URL("../src/components/BrandLogo.tsx", import.meta.url),
     "utf8",
   );
-  assert.match(brandLogoSource, /"\.\.\/assets\/brand\/logo-light\.png"/);
-  assert.match(brandLogoSource, /"\.\.\/assets\/brand\/logo-dark\.png"/);
+  assert.match(brandLogoSource, /"\.\.\/assets\/brand\/iagent-mark\.png"/);
   assert.doesNotMatch(brandLogoSource, /\.\.\/\.\.\/build\//);
 });
 

@@ -12,13 +12,19 @@ Render the normal Composer toolbar for an active remote session that denies Stop
 - **Entry:** Build the Desktop and Agent Runtime bundle, then run
   `node scripts/e2e-iagent.mjs` with a built host-core binary.
 - **Environment:** Isolated Desktop profile, real Host and Agent Runtime,
-  and a loopback fixture for the iAgent account, catalog and gateway APIs.
+  and loopback fixtures for iAgent account, pricing and gateway APIs and
+  the public models.dev metadata source.
 - **Sequence:** Open the guest desktop, connect an account in Models settings,
-  send an image request in Agent mode, replace the available chat group,
-  refresh the catalog and disconnect.
-- **Expected:** The model selector lists only authorized chat models, the
-  chat uses its existing workspace key, image generation creates one media
-  key and renders the results, and the account's groups disappear on sign-out.
+  compare a model's price across groups, select a supported thinking level,
+  send a chat message and then an image request in Agent mode, replace the
+  available chat groups, refresh the catalog and disconnect.
+- **Expected:** The model selector shows complete group labels at normal and
+  narrow widths and displays group-adjusted prices on an opaque surface in
+  both themes. A newly matched model
+  exposes its supported levels, and the gateway receives the selected
+  thinking parameter. Chat reuses workspace keys. Image generation creates
+  one media key, polls each accepted image task and renders the results.
+  The groups disappear on sign-out.
 - **Additional coverage:** `iagent-integration.test.mjs` exercises ordering,
   two-factor login, incomplete key inventory, timeouts and account isolation.
 

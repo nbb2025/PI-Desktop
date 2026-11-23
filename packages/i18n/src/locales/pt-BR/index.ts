@@ -343,6 +343,13 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    iagentGroupRate: "Fator ×{{rate}}",
+    iagentTokenPrice: "Entrada {{input}} · Saída {{output}} / 1 M de tokens",
+    iagentPricePerRequest: "{{price}} / solicitação",
+    iagentPriceUnavailable: "Preço do grupo indisponível",
+    iagentPriceReference: "Estimativa",
+    iagentPriceStandard: "Preço padrão do grupo",
+    iagentPriceTiered: "Por faixas",
     promptRetractionFailed: "Não foi possível restaurar o rascunho com segurança. A conversa foi preservada.",
     tableActions: "Ações da tabela",
     markdownPlainTextFallback: "Respostas extensas são exibidas como texto simples para manter a interface responsiva.",

@@ -796,22 +796,10 @@ visually distinct from list content.
   conversation topbar toggle, and the composer's add/enhance/undo controls all
   render the same 28px square target as the topbar and work-panel actions
   instead of a wider-than-tall pill.
-- `BrandLogo` imports the renderer-sized marks derived from the canonical
-  masters through Vite: `src/assets/brand/logo-light.png` for light mode and
-  `src/assets/brand/logo-dark.png` for dark mode (192x192, covering the 64 px
-  splash at 3x; ADR 0125). The component subscribes to
-  `document.documentElement[data-theme]` via a `MutationObserver` and swaps the
-  source at runtime for the sidebar and startup splash without a reload. The
-  empty-home hero uses `HomeMascotLogo` as a 100px eight-frame GIF. Light and
-  dark themes each have a dedicated GIF plus still PNG. CSS follows
-  `document.documentElement[data-theme]` without a reload; anything other than
-  `light` uses the dark artwork. The mascot loops a processed wave with a
-  short idle hold on the first frame. Playback is native to the GIF and does
-  not change on pointer hover; reduced motion swaps to the matching still
-  first-frame PNG. The expanded/collapsed sidebar remains 20px/18px and the
-  startup splash 64px.
-  Home and thread-docked composer prompt rows do not render a leading brand
-  icon.
+- `BrandLogo` imports the 256px iAgent website mark through Vite. Both themes
+  use this mark in the 100px empty-home hero, at 20px/18px in the
+  expanded/collapsed sidebar, and in the 64px startup splash. The model
+  selector reuses the mark when an iAgent model is selected.
 - Project and Temporary session creation controls render the dedicated
   message-plus session icon. Generic
   `IconPlus` remains reserved for adding non-session entities.

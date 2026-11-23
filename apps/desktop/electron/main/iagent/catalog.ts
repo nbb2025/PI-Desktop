@@ -1,8 +1,13 @@
 import {
+  CATALOG_DEFAULT_CONTEXT_WINDOW,
+  CATALOG_DEFAULT_MAX_TOKENS,
   IAGENT_ORIGIN,
+  publishedThinkingLevels,
   type ModelBinding,
+  type ModelInfo,
   type ProviderPublic,
 } from "@pi-desktop/shared";
+import { iagentChatPrice, iagentGroupRate, type IagentPrices } from "./pricing.ts";
 
 export type IagentGroup = {
   id: number;
@@ -10,6 +15,9 @@ export type IagentGroup = {
   platform: string;
   status: string;
   claude_code_only?: boolean;
+  rate_multiplier?: number;
+  user_rate_multiplier?: number;
+  long_context_pricing_enabled?: boolean;
 };
 
 export type IagentCatalogModel = {
@@ -18,7 +26,9 @@ export type IagentCatalogModel = {
   group_id: number;
   platform?: string;
   context_length?: number;
+  max_input_tokens?: number;
   max_output_tokens?: number;
+  default_pricing?: unknown;
 };
 
 type SortRule = {
@@ -31,7 +41,12 @@ export type IagentCatalog = {
   models: IagentCatalogModel[];
   group_order?: number[];
   sort_rules?: SortRule[];
+  price_unit?: string;
 };
+
+export type IagentModelLookup = (
+  provider: Pick<ProviderPublic, "id" | "baseUrl" | "vendorKey">, modelId: string,
+) => ModelInfo | undefined;
 
 export type IagentImageModel = {
   group: IagentGroup;
@@ -131,31 +146,43 @@ function chatRoute(group: IagentGroup) {
   }
 }
 
-function binding(model: IagentCatalogModel): ModelBinding {
+function modelBinding(model: IagentCatalogModel, published?: ModelInfo): ModelBinding {
+  const context = [model.context_length, model.max_input_tokens].find(validId);
+  const output = validId(model.max_output_tokens) ? model.max_output_tokens : undefined;
+  const levels = publishedThinkingLevels(published);
   return {
     id: model.id,
     alias: model.name || undefined,
-    contextWindow: validId(model.context_length) ? model.context_length : 0,
-    contextWindowSource: validId(model.context_length) ? "user" : "catalog",
-    maxTokens: validId(model.max_output_tokens) ? model.max_output_tokens : 0,
-    maxTokensSource: validId(model.max_output_tokens) ? "user" : "catalog",
-    thinkingLevels: [],
-    defaultThinkingLevel: null,
+    contextWindow: context ?? published?.contextWindow ?? CATALOG_DEFAULT_CONTEXT_WINDOW,
+    contextWindowSource: context === undefined ? "catalog" : "user",
+    maxTokens: output ?? published?.maxTokens ?? CATALOG_DEFAULT_MAX_TOKENS,
+    maxTokensSource: output === undefined ? "catalog" : "user",
+    thinkingLevels: levels.length ? levels : ["off"],
+    defaultThinkingLevel: levels.some((level) => level !== "off") ? "omit" : null,
+    thinkingProtocol: published?.thinkingProtocol,
   };
 }
 
-export function projectIagentCatalog(owner: number, groups: readonly IagentGroup[], catalog: IagentCatalog, time: number) {
+export function projectIagentCatalog(
+  owner: number, groups: readonly IagentGroup[], catalog: IagentCatalog, time: number,
+  modelLookup?: IagentModelLookup, prices?: IagentPrices,
+) {
   const positions = new Map((catalog.group_order ?? []).map((id, index) => [id, index]));
   const visible = groups.filter((group) => group.status === "active" && !videoGroup.has(platform(group.platform)));
   const routes = new Map<string, IagentGroup>();
   const providers: ProviderPublic[] = [];
+  const models = new Map<string, ModelInfo[]>();
   const images: IagentImageModel[] = [];
   const date = new Date(time).toISOString();
   for (const group of visible.sort((left, right) =>
     (positions.get(left.id) ?? Infinity) - (positions.get(right.id) ?? Infinity) ||
     naturalOrder.compare(right.name, left.name) || left.id - right.id)) {
+    const id = `${providerPrefix}${owner}:${group.id}`;
+    const route = chatRoute(group);
+    const rate = iagentGroupRate(group, prices);
     const seen = new Set<string>();
     const chat: ModelBinding[] = [];
+    const choices: ModelInfo[] = [];
     for (const model of orderedIagentModels(catalog.models.filter((entry) => entry.group_id === group.id), catalog.sort_rules ?? [])) {
       const value = `${model.id} ${model.name ?? ""}`;
       const identity = model.id.toLowerCase();
@@ -163,19 +190,36 @@ export function projectIagentCatalog(owner: number, groups: readonly IagentGroup
       seen.add(identity);
       const protocol = imageProtocol(group, model);
       if (protocol) images.push({ group, model: model.id, protocol });
-      if (!group.claude_code_only && !imageName.test(value)) chat.push(binding(model));
+      if (group.claude_code_only || imageName.test(value)) continue;
+      const published = modelLookup?.({ id, ...route }, model.id);
+      const binding = modelBinding(model, published);
+      chat.push(binding);
+      choices.push({
+        capabilities: ["text"],
+        source: "discovered",
+        ...published,
+        modelId: model.id,
+        displayName: label(model),
+        providerId: id,
+        contextWindow: binding.contextWindow,
+        maxTokens: binding.maxTokens,
+        discoveryState: "published",
+        iagentChatPrice: iagentChatPrice(group, model, rate, catalog.price_unit, prices),
+      });
     }
     if (!chat.length) continue;
-    const id = `${providerPrefix}${owner}:${group.id}`;
-    const route = chatRoute(group);
     routes.set(id, group);
+    models.set(id, choices);
+    const levels = chat[0].thinkingLevels;
     providers.push({
       id, name: group.name, ...route, type: "openai_compatible", protocol: route.apiStyle, authKind: "api_key",
       enabled: true, managedBy: "iagent", hasSecret: true, models: chat,
-      supportsReasoning: false, supportedThinkingLevels: ["off"], createdAt: date, updatedAt: date,
+      iagentRate: rate,
+      supportsReasoning: levels.some((level) => level !== "off"), supportedThinkingLevels: levels,
+      createdAt: date, updatedAt: date,
     });
   }
-  return { routes, providers, images };
+  return { routes, providers, models, images };
 }
 
 export function parseIagentGroups(value: unknown): IagentGroup[] {

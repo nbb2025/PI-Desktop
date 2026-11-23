@@ -101,13 +101,11 @@ test("macOS development uses the canonical PI-Desktop Dock icon", () => {
   );
 });
 
-test("macOS icon derivation preserves the canonical renderer asset", () => {
-  assert.match(iconScriptSource, /SOURCE = BUILD \/ "icon_1024\.png"/);
+test("macOS icon derivation uses the canonical iAgent website asset", () => {
+  assert.match(iconScriptSource, /SOURCE = .*"assets" \/ "brand" \/ "iagent-mark\.png"/);
   assert.match(iconScriptSource, /with Image\.open\(SOURCE\) as source/);
-  assert.doesNotMatch(
-    iconScriptSource,
-    /\.save\(BUILD \/ "icon_1024\.png"\)/,
-  );
+  assert.match(iconScriptSource, /master\.save\(BUILD \/ "icon_1024\.png"\)/);
+  assert.doesNotMatch(iconScriptSource, /\.save\(SOURCE/);
 });
 
 test("development launcher resolves Electron before platform-specific setup", () => {

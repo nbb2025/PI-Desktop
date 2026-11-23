@@ -120,6 +120,10 @@ export class IagentAccount {
     return this.request<unknown>(`/site-api/models${force ? "?refresh=1" : ""}`, { envelope: false });
   }
 
+  publicChannels(force: boolean) {
+    return this.request<unknown>(`/site-api/channels${force ? "?refresh=1" : ""}`, { envelope: false });
+  }
+
   async authenticated<T>(session: IagentSession, path: string, body?: unknown, idempotencyKey?: string): Promise<T> {
     const access = await this.access(session);
     this.assertSession(session);

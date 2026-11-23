@@ -372,8 +372,9 @@ const {
 const { iagent, managedProviders } = installIagentRuntime({
   app,
   getHost,
+  modelsDevCatalog,
   onChange: (update) => sendToRenderer(IPC.event.iagentChanged, update),
-  onRefreshError: () => logger.app("provider", "warn", "iAgent account refresh could not start"),
+  onRefreshError: (area) => logger.app("provider", "warn", `iAgent ${area} refresh failed`),
 });
 
 const providerCatalogRuntime = createProviderCatalogRuntime({

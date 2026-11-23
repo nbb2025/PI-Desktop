@@ -2020,18 +2020,12 @@ this does not claim an installed full-app settings journey.
 - **Preconditions**: App running in both English and zh-CN locales, with an
   empty home and a docked transcript available.
 - **Steps**: 1) Inspect the expanded and collapsed sidebar. 2) Inspect the
-  empty-home hero and docked composer. 3) Observe the eight-frame mascot GIF
-  looping in place, move the pointer over it, and confirm its cadence and
-  geometry do not change. Enable reduced motion and confirm the still first
-  frame is shown. 4) Focus the footer Settings and Plugins icons, then each
-  project/Temporary session create control. 5) Open Settings and the composer
-  input.
+  empty-home hero and docked composer in both themes. 3) Focus the footer
+  Settings and Plugins icons, then each project/Temporary session create
+  control. 4) Open Settings and the composer input.
 - **Expected**: Visible shell identity reads `PI-Desktop`; the empty-home hero
-  renders the theme-matching 100px `HomeMascotLogo` GIF with a short idle hold
-  and a looping wave. Pointer hover does not alter the cadence or geometry,
-  and reduced motion shows the matching still first frame.
-  The expanded/collapsed
-  sidebar renders the derived `src/assets/brand/logo-*.png` asset through `BrandLogo`
+  renders the 100px iAgent website mark. The expanded/collapsed
+  sidebar renders `src/assets/brand/iagent-mark.png` through `BrandLogo`
   and the docked composer prompt row has no leading
   brand icon or reserved icon slot and its text aligns directly with the input
   gutter. The right Composer toolbar shows a Bot model × reasoning chip and
@@ -2045,8 +2039,7 @@ this does not claim an installed full-app settings journey.
 - **Specs linked**: `04-ux/01-ui-ia.md`, `04-ux/07-ui-design-system.md`,
   `04-ux/08-component-spec.md`, `04-ux/09-interaction-patterns.md`,
   `08-meta/decisions-log.md` (D094/D160/D293),
-  `../../adr/0031-icon-free-composer-prompt-row.md`,
-  `../../adr/0152-eight-frame-empty-home-mascot-gif.md`
+  `../../adr/0031-icon-free-composer-prompt-row.md`
 - **Acceptance**: Quality (brand consistency and key operations feel polished)
 - **Milestone**: M5
 - **Status**: Unit-covered (`renderer-branding.test.mjs`); scenario Documented
