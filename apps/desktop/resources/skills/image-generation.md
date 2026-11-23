@@ -6,8 +6,9 @@ description: Generate or edit raster images, illustrations, photos, banners, and
 # Image generation
 
 Use the desktop `GenerateImages` tool. The user selects its provider and model
-under Settings → Models → Image generation model; this is independent of the chat
-model. If ToolSearch is available and GenerateImages is not loaded, discover it
+under Settings → Models → Image generation model. A connected iAgent account
+can supply a synchronized image model when that setting is empty. The image
+model is independent of the chat model. If ToolSearch is available and GenerateImages is not loaded, discover it
 there first. Do not install an SDK, run an API script, ask for a key in chat, or
 substitute the conversation model.
 
@@ -21,8 +22,8 @@ substitute the conversation model.
   Specify what changes and what must stay unchanged. For a follow-up edit, use
   the previous result path. Inputs must be under the current project, session
   scratch directory, or attachment store. Do not use remote URLs.
-- Editing uses OpenAI Images multipart requests and depends on the selected
-  model supporting that endpoint. Do not silently replace an edit with a fresh
+- Editing depends on the selected provider and model supporting reference images.
+  Do not silently replace an edit with a fresh
   generation if it fails. Mask painting is not a desktop UI feature.
 
 ## Generate one image or a batch
@@ -41,8 +42,8 @@ Example: two cover variants and one distinct icon:
 
 Generation may incur cost. Do not retry failed or timed-out items automatically,
 including after cancellation: the provider may already have processed them.
-Report partial success and wait for a user request before retrying. If no image
-model is configured, direct the user to Settings → Models; do not select one silently.
+Report partial success and wait for a user request before retrying. If the tool
+reports no available image model, direct the user to Settings → Models.
 
 ## Deliver the result
 

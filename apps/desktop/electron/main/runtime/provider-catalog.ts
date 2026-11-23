@@ -67,11 +67,13 @@ export type SessionCapabilityDefaults = {
 export type ProviderCatalogRuntimeDependencies = {
   getHost: () => HostProcess | null;
   modelsDevCatalog: ModelsDevCatalog;
+  managedProviders?: () => RuntimeProvider[];
 };
 
 export function createProviderCatalogRuntime({
   getHost,
   modelsDevCatalog,
+  managedProviders,
 }: ProviderCatalogRuntimeDependencies) {
   const bindingForModel = (
     provider: Pick<RuntimeProvider, "models">,
@@ -388,8 +390,9 @@ export function createProviderCatalogRuntime({
       { includeDisabled },
     );
     await modelsDevCatalog.ensureLoaded();
-    for (const provider of result.providers) modelsDevCatalog.configureAccount(provider);
-    return result.providers;
+    const providers = [...(managedProviders?.() ?? []), ...result.providers];
+    for (const provider of providers) modelsDevCatalog.configureAccount(provider);
+    return providers;
   };
 
   const enrichProviderList = async <T extends RuntimeProvider>(result: {

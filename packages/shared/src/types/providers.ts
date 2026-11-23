@@ -47,6 +47,8 @@ export type ProviderPublic = {
    * `providers.delete` refuse it.
    */
   ownerPluginId?: string;
+  /** An account-backed provider projected from iAgent's available groups. */
+  managedBy?: "iagent";
   createdAt: string;
   updatedAt: string;
 };

@@ -1,4 +1,5 @@
 import type { ReviewContextLines, ReviewContextResult, ReviewTurnsPage, ReviewChangesPage } from "@pi-desktop/shared";
+import type { IagentLoginResult, IagentStatus, IagentUpdate } from "@pi-desktop/shared";
 type ClipboardDirectoryPaste = {
   items: Array<{ kind: "directory"; path: string; name: string } | { kind: "file"; name: string }>;
   token: string | null;
@@ -980,6 +981,17 @@ export const api = {
     invoke<{ ok: boolean }>(IPC.invoke.providersReorder, input),
   listProviders: () =>
     invoke<{ providers: ProviderPublic[] }>(IPC.invoke.providersList),
+  iagentStatus: () => invoke<IagentStatus>(IPC.invoke.iagentStatus),
+  iagentLogin: (email: string, password: string) =>
+    invoke<IagentLoginResult>(IPC.invoke.iagentLogin, { email, password }),
+  iagentConfirm: (challengeId: string, code: string) =>
+    invoke<IagentStatus>(IPC.invoke.iagentConfirm, { challengeId, code }),
+  iagentLogout: () => invoke<IagentStatus>(IPC.invoke.iagentLogout),
+  iagentRefresh: () => invoke<IagentStatus>(IPC.invoke.iagentRefresh),
+  onIagentChanged: (listener: (update: IagentUpdate) => void) => {
+    if (!window.piDesktop?.on) return () => undefined;
+    return window.piDesktop.on(IPC.event.iagentChanged, (payload) => listener(payload as IagentUpdate));
+  },
   createProvider: (input: ProviderCreateInput) =>
     invoke<{ provider: ProviderPublic }>(IPC.invoke.providersCreate, input),
   updateProvider: (input: ProviderUpdateInput) =>

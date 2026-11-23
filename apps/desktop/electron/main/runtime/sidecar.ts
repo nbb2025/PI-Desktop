@@ -12,6 +12,7 @@ import {
   loadBuiltinSkillBody,
 } from "../builtin-skills";
 import { createImageGenerationTool } from "../services/image-generation-service";
+import type { IagentIntegration } from "../iagent/integration";
 import { createComputerUseTool } from "../computer-use/service";
 import { resolveComputerUseProvider } from "../computer-use/provider";
 import type { ComputerCursorOverlay } from "../computer-use/cursor-overlay";
@@ -57,6 +58,7 @@ export type SidecarRuntimeDependencies = {
   dataDir: string;
   agentExtensions: AgentExtensionBridge;
   vendorOAuth: VendorOAuth;
+  iagent?: IagentIntegration;
   listRuntimeProviders: (includeDisabled?: boolean) => Promise<any[]>;
   modelsDevCatalog: ModelsDevCatalog;
   effectiveSubagentModelConfig: (...args: any[]) => any;
@@ -97,6 +99,7 @@ export function createSidecarRuntime({
   dataDir,
   agentExtensions,
   vendorOAuth,
+  iagent,
   listRuntimeProviders,
   modelsDevCatalog,
   effectiveSubagentModelConfig,
@@ -583,6 +586,7 @@ export function createSidecarRuntime({
   s.setLocalTool("GenerateImages", createImageGenerationTool({
     dataDir,
     getHost: () => runtimeState.host,
+    resolveDefault: iagent?.imageEndpoint,
     resolveAuth: providerId => vendorOAuth.resolveAuth(providerId),
     resolveImageModel: async (provider, modelId) => {
       await modelsDevCatalog.ensureLoaded();

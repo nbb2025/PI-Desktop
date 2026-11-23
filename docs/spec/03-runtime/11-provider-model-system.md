@@ -671,6 +671,40 @@ UI may show tier hints, but must not hard-block unknown models by default.
 5. Release catalog changes arrive through the reviewed models.dev snapshot;
    pi-ai version pins continue to control transport and OAuth behavior.
 
+### iAgent accounts
+
+Settings → Models offers optional email and password sign-in with an in-app
+verification step for accounts using two-factor authentication. Account
+credentials are kept in the host's encrypted secret store. The renderer sees
+account status and catalog metadata. The application can be opened as a guest.
+
+iAgent chat providers are projected from the intersection of the signed-in
+account's active groups and the site's published model catalog. They have
+stable account and group identities and can be selected in the Composer. The
+projection follows `group_order` and `sort_rules`, using natural descending
+order for unranked names. Video-only groups, image-only models, Auto Review
+and non-chat endpoints do not enter the chat selector.
+
+The Desktop checks for catalog changes on startup, on focus when the cache is
+due, once per minute while running, and on explicit refresh. A failed read
+retains the last successfully verified snapshot for the current process. A
+successful membership read removes revoked groups even if the site catalog
+cannot be read. Launches verify the selected group and model and ask the user
+to reselect when a pinned model disappears.
+
+Chat and image generation acquire scoped workspace keys at dispatch.
+The first use searches the complete account inventory for the existing
+`聊天` or `创意工坊` key before creating one. Its binding or an unclear
+creation outcome is retained per account, group and purpose. Synchronization
+and sign-out do not mutate the key inventory.
+
+The bundled imagegen skill uses `GenerateImages` in Agent mode. An explicitly
+configured image model wins. Otherwise iAgent supplies an authorized image
+model, preferring GPT Image and retaining the site's ordering among eligible
+choices. OpenAI Images, Gemini inline image generation and Grok Imagine
+generation and edits use their respective iAgent routes. The ordinary tool
+permission, cancellation and local result rendering rules apply.
+
 ## 14. Local / offline model support
 
 Supported via OpenAI-compatible local servers:

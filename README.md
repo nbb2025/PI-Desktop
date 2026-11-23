@@ -514,6 +514,10 @@ Execution
 
 ## Get started
 
+Connect iAgent in **Settings → Models** to sync available chat groups and use
+the bundled **imagegen** skill with an authorized iAgent image model. See the
+[account and catalog behavior](docs/spec/03-runtime/11-provider-model-system.md#iagent-accounts).
+
 <table>
 <tr>
 

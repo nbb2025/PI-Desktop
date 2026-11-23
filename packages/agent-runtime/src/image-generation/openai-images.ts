@@ -32,7 +32,7 @@ export function codexImagesBaseUrl(baseUrl: string): string {
  * `multipart` is the OpenAI Images API: a form for edits, JSON for generation.
  * `codex-json` is the Codex backend: JSON for both, input images as data URLs.
  */
-export type ImageRequestTransport = "multipart" | "codex-json";
+export type ImageRequestTransport = "multipart" | "codex-json" | "iagent-grok";
 
 export function safeImageError(error: unknown): string {
   return error && typeof error === "object" && "errorCode" in error &&
@@ -64,7 +64,17 @@ export function openAIImagesAdapter(
         const images = context.input.filter(item => item.type === "image");
         const responseFormat = /^dall-e-[23]$/i.test(model.id) ? "b64_json" : undefined;
         let body: BodyInit;
-        if (transport === "codex-json") {
+        if (transport === "iagent-grok") {
+          const editModel = /^grok-imagine-edit$/i.test(model.id.split("/").at(-1) ?? "");
+          if (editModel !== Boolean(images.length)) throw imageError("IMAGE_EDIT_UNAVAILABLE");
+          const references = images.map((image) => ({ image_url: inputImageDataUrl(image.data) }));
+          headers.set("Content-Type", "application/json");
+          body = JSON.stringify({
+            model: model.id, prompt, n: 1,
+            ...(references.length ? { image: references[0] } : {}),
+            ...(references.length > 1 ? { images: references } : {}),
+          });
+        } else if (transport === "codex-json") {
           // The shape the Codex client sends: one JSON body for generation and
           // editing alike, input images inline as data URLs, size at the
           // backend's own auto default.

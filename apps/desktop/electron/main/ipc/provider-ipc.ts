@@ -23,6 +23,8 @@ import {
 import type { HostProcess } from "../host-process";
 import type { Logger } from "../logger";
 import type { IpcRegistrar } from "./types";
+import { isIagentProvider } from "../iagent/catalog";
+import type { IagentIntegration } from "../iagent/integration";
 /**
  * One line explaining why a candidate sweep found nothing: every endpoint that
  * was tried and what it answered. The list is the explanation the settings
@@ -76,6 +78,7 @@ export type ProviderIpcDependencies = {
     | "publishedModelFor"
   >;
   vendorOAuth: VendorOAuth;
+  iagent?: IagentIntegration;
   logger: Pick<Logger, "app">;
   enrichProvider: (provider: RuntimeProvider, selectedModelId?: string) => any;
   listRuntimeProviders: () => Promise<RuntimeProvider[]>;
@@ -90,6 +93,7 @@ export function registerProviderIpc({
   getHost,
   modelsDevCatalog,
   vendorOAuth,
+  iagent,
   logger,
   enrichProvider,
   listRuntimeProviders,
@@ -350,6 +354,25 @@ export function registerProviderIpc({
     ) => {
       if (!host) throw new Error("host unavailable");
       const req = typeof input === "string" ? { providerId: input } : input ?? {};
+      if (req.providerId && isIagentProvider(req.providerId) && iagent) {
+        const provider = iagent.providers().find((row) => row.id === req.providerId);
+        if (!provider) return { models: [], source: "catalog" };
+        await modelsDevCatalog.ensureLoaded();
+        const models = iagent.modelChoices(provider.id).map((choice) => {
+          const published = modelsDevCatalog.findModel({
+            providerId: provider.id, vendorKey: provider.vendorKey,
+            baseUrl: provider.baseUrl, modelId: choice.modelId,
+          });
+          if (!published) return choice;
+          const info = modelInfoFromModelsDev(published, provider.id);
+          return {
+            ...info, modelId: choice.modelId, displayName: choice.displayName,
+            contextWindow: choice.contextWindow ?? info.contextWindow,
+            maxTokens: choice.maxTokens ?? info.maxTokens, discoveryState: "published",
+          };
+        });
+        return { models, source: "catalog" };
+      }
       const providers = req.source === "cache"
         ? (await host.call<{ providers: RuntimeProvider[] }>("providers.list", {
             includeDisabled: true,

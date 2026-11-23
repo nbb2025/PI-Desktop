@@ -7,6 +7,21 @@ Render the normal Composer toolbar for an active remote session that denies Stop
 > Part of the [E2E test plan](../04-e2e-test-plan.md). Provider setup, credentials, OAuth, model catalogs, wire protocols, usage, and hosted search.
 > Scenario template, gates, and traceability live in the plan.
 
+## E2E-iAgent-account-catalog-and-imagegen
+
+- **Entry:** Build the Desktop and Agent Runtime bundle, then run
+  `node scripts/e2e-iagent.mjs` with a built host-core binary.
+- **Environment:** Isolated Desktop profile, real Host and Agent Runtime,
+  and a loopback fixture for the iAgent account, catalog and gateway APIs.
+- **Sequence:** Open the guest desktop, connect an account in Models settings,
+  send an image request in Agent mode, replace the available chat group,
+  refresh the catalog and disconnect.
+- **Expected:** The model selector lists only authorized chat models, the
+  chat uses its existing workspace key, image generation creates one media
+  key and renders the results, and the account's groups disappear on sign-out.
+- **Additional coverage:** `iagent-integration.test.mjs` exercises ordering,
+  two-factor login, incomplete key inventory, timeouts and account isolation.
+
 ## E2E-USAGE-explicit-zero-cache
 
 - Complete a controlled Pi request with nonzero input/output and explicit zero

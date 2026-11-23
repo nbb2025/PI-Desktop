@@ -532,6 +532,17 @@ export function useAppShellRuntime() {
 
   useEffect(() => {
     if (!ready) return;
+    return api.onIagentChanged(({ catalogChanged }) => {
+      if (catalogChanged) {
+        void useAppStore.getState().refreshProviders().catch((error: unknown) => {
+          console.warn("Could not refresh the iAgent model menu", error);
+        });
+      }
+    });
+  }, [ready]);
+
+  useEffect(() => {
+    if (!ready) return;
     void refreshPluginThemes();
     // Enabling, disabling or uninstalling a plugin changes which themes exist.
     // Runtime `themes.upsert` / `themes.remove` also emit this event.

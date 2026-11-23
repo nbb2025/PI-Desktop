@@ -14,6 +14,7 @@ export * from "./types/worktree.js";
 export * from "./types/agent.js";
 export * from "./types/workspace.js";
 export * from "./types/providers.js";
+export * from "./types/iagent.js";
 export * from "./types/settings.js";
 export * from "./types/plugins.js";
 export * from "./types/capabilities.js";
