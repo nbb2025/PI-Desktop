@@ -7,11 +7,12 @@ const inputImage = { bytes: Buffer.from(png, "base64"), mimeType: "image/png", e
 const base = { baseUrl: `${IAGENT_ORIGIN}/v1`, apiKey: "fixture", vendorKey: "iagent" };
 
 describe("iAgent image routes", () => {
-  it("polls a single paid GPT Image job past the former three-minute deadline", async () => {
+  it("recovers a dropped query while polling a single GPT Image job past the former deadline", async () => {
     vi.useFakeTimers();
     try {
       const startedAt = Date.now();
       const task = "imgtask_slow";
+      let queries = 0;
       const dispatch = vi.fn<typeof fetch>(async (url, init) => {
         const path = new URL(String(url)).pathname;
         const headers = new Headers(init?.headers);
@@ -27,6 +28,11 @@ describe("iAgent image routes", () => {
         expect(path).toBe(`/site-api/image-tasks/${task}`);
         expect(init?.method).toBe("GET");
         expect(headers.get("authorization")).toBe("Bearer fixture");
+        if (++queries === 1) {
+          return new Response(new ReadableStream({
+            start(stream) { stream.error(new TypeError("Image task response disconnected")); },
+          }));
+        }
         const completed = Date.now() - startedAt >= 4 * 60_000;
         return Response.json({
           task_id: task, status: completed ? "completed" : "processing",

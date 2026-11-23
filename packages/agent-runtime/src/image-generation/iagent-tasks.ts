@@ -136,24 +136,27 @@ export async function requestIagentImage({
         if (terminalSuccess.has(state)) return { response, payload: taskResult(payload), taskId: id };
         if (terminalFailure.has(state)) throw imageError("IMAGE_TASK_FAILED");
         await waitToPoll(delay, signal);
-        let next: Response | undefined;
+        let query: { response: Response; payload?: TaskPayload } | undefined;
         try {
-          next = await request(path, readTimeout, { headers: queryHeaders });
-        } catch {
+          const next = await request(path, readTimeout, { headers: queryHeaders });
+          query = { response: next, payload: next.ok ? await readPayload(next) : undefined };
+        } catch (error) {
           signal.throwIfAborted();
+          if (error instanceof Error && "errorCode" in error && error.errorCode === "IMAGE_TOO_LARGE") throw error;
         }
-        if (!next || transient(next.status)) {
-          await next?.body?.cancel();
+        if (!query || transient(query.response.status)) {
+          await query?.response.body?.cancel();
           if (++failures >= 5) throw imageError("IMAGE_TASK_QUERY_INTERRUPTED");
           delay = Math.min(delay * 2, 30_000);
           continue;
         }
+        const { response: next, payload: nextTask } = query;
         if (!next.ok) {
           await next.body?.cancel();
           throw statusError(next.status);
         }
-        payload = await readPayload(next);
-        if ((payload.task_id ?? payload.id) !== id) throw imageError("IMAGE_INVALID_RESPONSE");
+        if (!nextTask || (nextTask.task_id ?? nextTask.id) !== id) throw imageError("IMAGE_INVALID_RESPONSE");
+        payload = nextTask;
         response = next;
         failures = 0;
         delay = retryAfter(response);
