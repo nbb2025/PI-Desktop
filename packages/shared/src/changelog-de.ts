@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "Für Windows gibt es ein gemeinsames Installationsprogramm für x86 und x64 und für macOS ein Universal-DMG für Apple Silicon und Intel.",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

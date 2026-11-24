@@ -570,41 +570,20 @@ Agent / Plan / Goal
 
 ### [Download PI-Desktop →](https://github.com/nbb2025/PI-Desktop/releases/latest)
 
-**macOS · Windows · Linux**
+**macOS · Windows**
 
 </div>
 
 ### Packages
 
-| Platform | Architecture  | Package                                 |
-| -------- | ------------- | --------------------------------------- |
-| macOS    | Apple Silicon | `.dmg` / `.zip`                         |
-| macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows  | x86 / x64     | NSIS installer (x64 also has ZIP)       |
-| Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
+| Platform | Architecture | Installer |
+| -------- | ------------ | --------- |
+| macOS | Apple Silicon and Intel | Universal DMG |
+| Windows | x86 and x64 | Universal NSIS installer |
 
-Windows installers receive in-app updates. macOS builds with Developer ID signing and notarization receive in-app updates. Manual macOS builds check for new releases and link to the installer.
+The Windows installer selects the correct architecture and supports in-app updates. The macOS app checks for updates and links to the DMG for installation. Upgrade from v0.24.0 by downloading the installer once.
 
-<details>
-<summary><strong>Linux Compatibility</strong></summary>
-
-<br />
-
-Linux packages require **glibc 2.35+**.
-
-Common supported distributions include:
-
-* Ubuntu 22.04+
-* Debian 12+
-* Fedora 36+
-
-Check your current version with:
-
-```bash
-ldd --version
-```
-
-</details>
+Linux desktop packages can be built locally using the [release runbook](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages). SSH workspace bootstrap requires a separately supplied matching host bundle.
 
 ---
 

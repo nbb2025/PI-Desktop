@@ -226,16 +226,17 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
 
-test("macOS targets follow the native architecture selected by the runner", () => {
+test("macOS publishes a single Universal DMG", () => {
   const macTargets = packageJson.build.mac.target;
   assert.deepEqual(
     macTargets.map((entry) => entry.target),
-    ["dmg", "zip"],
+    ["dmg"],
   );
   assert.ok(
     macTargets.every((entry) => entry.arch === undefined),
-    "macOS targets must not pin the package to Apple Silicon",
+    "the release wrapper selects the universal architecture",
   );
+  assert.equal(packageJson.build.dmg.writeUpdateInfo, false);
   assert.doesNotMatch(packageJson.scripts["dist:mac"], /--(?:arm64|x64)/);
 });
 

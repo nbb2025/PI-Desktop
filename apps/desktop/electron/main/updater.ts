@@ -1,10 +1,9 @@
 /**
  * App auto-update via electron-updater against GitHub Releases.
  *
- * The feed (latest*.yml + installers) is attached to each GitHub Release by
- * .github/workflows/release.yml. Discovery always tracks the latest stable
- * release (`allowPrerelease = false`) so RC installs still graduate to newer
- * stables. Delivery mode per install:
+ * Official Windows and macOS installers use the latest stable release API.
+ * Discovery tracks stable releases so RC installs graduate to newer stables.
+ * Delivery mode per install:
  *  - Windows NSIS / Linux AppImage / Developer ID-signed macOS → full in-app flow: silent
  *    background download, "restart to update" prompt, install-on-quit fallback.
  *  - Windows ZIP / legacy portable (`piDistribution = "zip"` or
@@ -44,7 +43,6 @@ import {
   UPDATE_CHECK_TIMEOUT_CODE,
 } from "./update-timeout";
 import {
-  releaseUpdateChannel,
   resolveDefaultUpdatePreference,
   resolveEffectiveUpdatePreference,
   resolveStoredUpdatePreference,
@@ -53,6 +51,7 @@ import {
   type WindowsDistribution,
 } from "./update-policy";
 import { ManualUpdateReminderTracker } from "./manual-update-reminder";
+import { ReleaseInstallerProvider } from "./release-installer-provider";
 
 export { resolveUpdateMode } from "./update-policy";
 export type { WindowsDistribution } from "./update-policy";
@@ -113,7 +112,6 @@ export type UpdaterOptions = {
   platform?: NodeJS.Platform;
   isPackaged?: boolean;
   distribution?: WindowsDistribution;
-  arch?: string;
   macUpdatesCapable?: boolean;
 };
 
@@ -127,7 +125,6 @@ export class AppUpdaterController {
   private readonly distribution?: WindowsDistribution;
   private readonly defaultPreference: UpdatePreference;
   private readonly automaticSupported: boolean;
-  private readonly channel?: string;
   private readonly readUpdateSettings?: () => Promise<UpdaterSettings>;
   private readonly persistLastNotifiedVersion?: (version: string) => Promise<void>;
   private readonly persistDismissedVersion?: (
@@ -210,7 +207,6 @@ export class AppUpdaterController {
       isPackaged,
       this.env,
     );
-    this.channel = releaseUpdateChannel(platform, options.arch ?? process.arch, macUpdatesCapable);
     this.readUpdateSettings = options.readUpdateSettings;
     this.persistLastNotifiedVersion = options.persistLastNotifiedVersion;
     this.persistDismissedVersion = options.persistDismissedVersion;
@@ -247,6 +243,10 @@ export class AppUpdaterController {
       );
     }
     this.autoUpdater = options.autoUpdater ?? relocated ?? autoUpdater;
+    if (isPackaged && (platform === "win32" || (platform === "darwin" && !macUpdatesCapable))) {
+      this.autoUpdater.setFeedURL({ provider: "custom", updateProvider: ReleaseInstallerProvider });
+      this.autoUpdater.disableDifferentialDownload = true;
+    }
     this.cacheMaintenance = new UpdateCacheMaintenance({
       resourcesPath: process.resourcesPath,
       activeBasePath,
@@ -466,7 +466,6 @@ export class AppUpdaterController {
     // newer stable release such as 0.2.2. Always track GitHub's latest
     // stable release so RC installs can graduate to stable.
     this.autoUpdater.allowPrerelease = false;
-    if (this.channel) this.autoUpdater.channel = this.channel;
     // Selecting a channel in electron-updater opts into downgrades by default.
     this.autoUpdater.allowDowngrade = false;
     // Only automatic mode may install on quit; manual mode never hands an

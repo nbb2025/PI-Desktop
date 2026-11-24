@@ -175,9 +175,8 @@ Remaining work is tracked as product hardening rather than unstarted MVP scope:
 
 ## Release constraint
 
-Tag releases publish **macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64**
-artifacts (D126 lifts the original D010 macOS-only constraint; D285 adds the
-native Intel lane).
+iAgent tag releases publish one **macOS Universal DMG** for Apple Silicon
+and Intel and one **Windows Universal installer** for x86 and x64.
 
 ## Rough effort (solo)
 

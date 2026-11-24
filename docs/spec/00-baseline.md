@@ -34,7 +34,9 @@
 > publish installers and electron-updater feeds for macOS arm64, Windows x64,
 > and Linux x64 and arm64.
 > D285 adds a native macOS Intel x64 tag lane alongside the arm64 lane; both
-> macOS architectures publish DMG/ZIP artifacts from their matching runners.
+> macOS architectures published DMG/ZIP artifacts from their matching runners.
+> From iAgent 0.24.1, tag releases use one Universal DMG for macOS and one
+> Universal NSIS installer for Windows. These are the only uploaded assets.
 > `0.4.8` moves the durable Projects index out of the home sidebar and into
 > Settings as the fifth **Project archive** destination through D133 / ADR 0026.
 > `0.4.9` made the pinned pi-ai catalog authoritative for known-model metadata

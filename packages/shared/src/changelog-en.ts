@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const enEntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "Windows uses one installer for x86 and x64, and macOS uses one Universal DMG for Apple Silicon and Intel.",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

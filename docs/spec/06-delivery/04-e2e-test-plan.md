@@ -86,7 +86,7 @@ levels does not waive the relevant E2E gate.
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS arm64 and Intel x64, Windows x64, and Linux x64 and arm64 release targets (D126/D285, D638 / ADR 0318) |
+| Platform | macOS Universal (arm64 and x64) and Windows Universal (x86 and x64) |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |

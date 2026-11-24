@@ -12,6 +12,10 @@ test("Windows host-core statically links the MSVC CRT for clean installs", async
     cargoConfig,
     /\[target\.x86_64-pc-windows-msvc\]\s*\nrustflags = \["-C", "target-feature=\+crt-static"\]/,
   );
+  assert.match(
+    cargoConfig,
+    /\[target\.i686-pc-windows-msvc\]\s*\nrustflags = \["-C", "target-feature=\+crt-static"\]/,
+  );
 });
 
 test("Windows keyboard hook retains only a weak stdout sender", async () => {

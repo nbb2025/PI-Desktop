@@ -174,54 +174,31 @@
 
 ## Release & Packaging
 
-## E2E-192: Linux release publishes a system-Electron ASAR asset
+## E2E-192: Local Linux packaging supports system-Electron repackaging
 
-- **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`; the
-  Linux x64 release runner can complete `dist:linux` and has a system Electron
-  available for repackaging validation. The arm64 lane is E2E-192a.
-- **Steps**: 1) Run the tag release workflow. 2) Inspect the published GitHub
-  Release assets. 3) Confirm the versioned
-  `PI-Desktop-X.Y.Z-linux-x64.asar` asset is present. 4) Place that archive in
-  the target Electron resources layout with the target package's native host
-  and other resources, then launch it with `electron <archive>.asar`.
-- **Expected**: The ASAR is copied byte-for-byte from
-  `linux-unpacked/resources/app.asar`, is uploaded alongside the Linux
-  AppImage, deb, and rpm, and the system Electron opens the PI-Desktop application
-  archive without requiring the bundled Electron executable.
+- **Preconditions**: A Linux x64 or arm64 runner can complete `dist:linux`
+  and has a compatible system Electron.
+- **Steps**: Build the local package, run `export-linux-asar.mjs` for that
+  architecture, place the exported archive in the target Electron resources
+  layout with the package's native host and resources, and launch it.
+- **Expected**: The versioned archive matches the unpacked `app.asar` byte
+  for byte. System Electron launches it with the matching Rust host.
 - **Specs linked**: `06-delivery/06-release-runbook.md`, `03-runtime/07-process-model.md`
-- **Acceptance**: Quality (release artifact and packaging compatibility)
-- **Milestone**: M6+
-- **Status**: Documented; artifact export is unit-covered, native system-Electron
-  repackaging remains runner validation
+- **Acceptance**: Quality (packaging compatibility)
+- **Status**: The archive export is covered by `release-asar.test.mjs`.
 
-## E2E-192a: Linux arm64 release lane publishes native arm64 packages
+## E2E-192a: The iAgent tag publishes exactly two installers
 
-- **Preconditions**: A `vX.Y.Z` tag matches `apps/desktop/package.json`; GitHub's
-  arm64 `ubuntu-22.04-arm` runner is available to the repository.
-- **Steps**: 1) Run the tag release workflow. 2) Confirm the arm64 lane ran on
-  an `aarch64` runner and that the packaged
-  `target/release/pi-desktop-host-core` is an AArch64 binary. 3) Inspect the
-  published Release assets for `PI-Desktop-X.Y.Z-linux-arm64.AppImage`,
-  `pi-desktop_X.Y.Z_arm64.deb`, `pi-desktop-X.Y.Z-aarch64.rpm`,
-  `PI-Desktop-X.Y.Z-linux-arm64.asar`, and
-  `pi-host-X.Y.Z-linux-arm64.tar.gz` with its `.sha256`. 4) Confirm
-  `latest-linux.yml` still lists the x64 AppImage while
-  `latest-linux-arm64.yml` lists the arm64 one. 5) Install the arm64 AppImage,
-  deb, or rpm on an arm64 Linux machine and launch it.
-- **Expected**: Both feeds describe exactly one architecture-labelled AppImage
-  each, the arm64 packages carry an arm64 host-core, the app starts on arm64
-  Linux, and merging the lanes never replaces the x64 feed with the arm64 one.
-- **Specs linked**: `06-delivery/06-release-runbook.md`, `01-product/01-product-scope.md`
-- **Acceptance**: Quality (release artifact and packaging compatibility)
-- **Milestone**: M6+
-- **Status**: The matrix, feed naming, artifact naming, and the ASAR export are
-  unit/source-contract covered (`ci-workflow.test.mjs`, `release-asar.test.mjs`);
-  native arm64 installation remains runner validation. Microphone capture stays
-  Raspberry Pi only on arm64 Linux (D638 / ADR 0318).
+- **Steps**: Build a matching tag and inspect the uploaded release assets.
+- **Expected**: The assets contain the Windows installer and Universal DMG.
+  Publish refuses unexpected files. The resulting description contains the
+  SHA-512 checksum of both installers.
+- **Specs linked**: `06-delivery/06-release-runbook.md`
+- **Status**: The writer and desktop provider share an installer release fixture.
 
 ## E2E-200: Linux RPM preserves the Wayland desktop identity
 
-- **Preconditions**: A Linux x64 package validation run or tag release can
+- **Preconditions**: A Linux x64 package validation run can
   complete on Ubuntu 22.04; a clean Fedora 44 KDE/Wayland machine is available
   for installation and launch.
 - **Steps**: 1) Build the Linux targets and inspect the RPM with `rpm -qip` and
@@ -231,7 +208,7 @@
   Fedora KDE/Wayland machine and launch PI-Desktop from its desktop entry.
   5) Inspect the taskbar grouping and the installed desktop entry.
 - **Expected**: The x64 RPM is produced with the documented name and uploads
-  with the release artifacts. Its desktop entry contains `Icon=pi-desktop` and
+  as an Actions validation artifact. Its desktop entry contains `Icon=pi-desktop` and
   `StartupWMClass=pi-desktop`; the running Wayland window groups with the
   PI-Desktop launcher and shows its icon instead of a generic Electron icon.
   The package remains notify-and-link for updates, and the bundled Electron
@@ -248,24 +225,22 @@
 
 - **Preconditions**: The Release workflow is dispatched with `sign_macos: false`
   or a matching tag is pushed with all Apple signing inputs absent.
-- **Steps**: 1) Dispatch the Release workflow with `sign_macos: false`. 2)
-  Confirm both macOS architectures produce DMG and ZIP packages with matching
-  native host binaries. 3) Verify the ad-hoc signatures and inspect the tag
-  release's `manual-mac.yml` when testing a tag.
-- **Expected**: Both bundles pass `codesign --verify --deep --strict`. Filenames
-  identify their native architectures. Tag runs publish the manual updater
-  feed with both ZIP checksums. Manual dispatches retain Actions artifacts.
+- **Steps**: Verify the Universal app and Rust host with
+  `lipo -verify_arch` for arm64 and x86_64 and verify the ad-hoc signature. Compare the
+  DMG's SHA-512 with the entry in the release description.
+- **Expected**: The lane produces one Universal DMG.
+  Existing manual builds can discover the release and open the DMG download
+  page. A tag publishes the assets, and manual dispatch retains them in Actions.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (manual installation)
 - **Milestone**: M6+
-- **Status**: Release workflow verifies macOS bundle integrity in both lanes.
+- **Status**: Release workflow checks macOS binary slices and bundle integrity.
 
 ## E2E-196b: macOS packages omit first-launch helper assets
 
-- **Preconditions**: A macOS manual-install packaging run has produced DMG and
-  ZIP artifacts for at least one native architecture.
+- **Preconditions**: A macOS packaging run has produced a Universal DMG.
 - **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
-  the only items in its window. 2) Inspect the ZIP root without extracting the
+  the only items in its window. 2) In the signed lane, inspect the ZIP root without extracting the
   app and confirm neither `PI-Desktop-macOS-opening-help.txt` nor
   `PI-Desktop-macOS-open.command` is present. 3) Confirm the app remains
   installable from the ZIP.
@@ -284,10 +259,10 @@
 - **Preconditions**: A `vX.Y.Z` tag matching `apps/desktop/package.json` is
   pushed, or the Release workflow is dispatched with `sign_macos: true`
   (default); GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
-  `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; both native macOS
-  runners are available.
-- **Steps**: 1) Run the tag workflow. 2) For each macOS architecture, inspect
-  the unpacked app with `codesign -dv --verbose=4` and confirm authority
+  `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; the macOS
+  release runner is available.
+- **Steps**: 1) Run the tag workflow. 2) Inspect the Universal
+  app with `codesign -dv --verbose=4` and confirm authority
   the configured publisher's Developer ID Application certificate. 3) Run
   `codesign --verify --deep --strict --verbose=2`,
   `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
@@ -747,16 +722,10 @@ for the active release and updater check.
   2. Inspect ASAR and resource inventories for sidecar, host, production
      modules, source maps, tests/examples/declarations, Chromium locales, and
      native prebuild targets.
-  3. On each macOS package, run `file` (or `lipo -info`) against the app
-     executable and `Resources/bin/pi-desktop-host-core`; confirm arm64 and
-     x86_64 packages contain only their declared architecture and that the
-     Rust host matches the Electron app. Confirm the shared
-     `apps/desktop/package.json` macOS configuration produces arm64 assets named
-     `PI-Desktop-X.Y.Z-arm64.dmg` and `PI-Desktop-X.Y.Z-arm64-mac.zip`, while
-     the Intel assets use `PI-Desktop-X.Y.Z-x64.dmg` and
-     `PI-Desktop-X.Y.Z-x64-mac.zip`; confirm the release directory has both
-     DMG and ZIP artifacts and one merged `latest-mac.yml` feed whose URLs and
-     checksums match those generated assets.
+  3. Check the Universal macOS app and `Resources/bin/pi-desktop-host-core`
+     with `lipo -verify_arch` for arm64 and x86_64. Verify the Universal DMG and
+     its SHA-512 in the release description. In the signed lane verify the
+     notarization ticket on the final DMG.
   4. Inspect the renderer output for its size controls: emitted JS is minified,
      no `.woff` or `.ttf` files are present, only the KaTeX `woff2` faces remain
      (no application font face is emitted any more), and
@@ -775,7 +744,7 @@ for the active release and updater check.
 - **Expected**: Each macOS package contains exactly one bundled agent sidecar,
   one Rust host matching its declared architecture, and only configured
   Chromium locale packs. The release output contains both native macOS
-  architectures, DMG/ZIP artifacts, and one merged updater feed. Each macOS
+  architectures, a single DMG, and installer metadata in the release description. Each macOS
   DMG and ZIP carries its standard `-arm64` or `-x64` architecture marker, and
   no generic macOS DMG, ZIP, or blockmap remains in the release output. The
   per-architecture updater metadata points to those names without collisions.
@@ -1022,13 +991,12 @@ for the active release and updater check.
 - **Milestone**: M5+
 - **Status**: Documented
 
-## E2E-211: Windows portable ZIP launches after extraction (D603)
+## E2E-211: Legacy Windows portable ZIP launches after extraction (D603)
 
-- **Preconditions**: A Windows x64 tag or `dist:win` package has produced both
-  `PI-Desktop-Setup-<version>.exe` and `PI-Desktop-Portable-<version>.zip` from
-  the shared electron-builder config; a clean user profile is available; the
+- **Preconditions**: An archived Windows x64 portable ZIP and the current
+  Universal NSIS installer are available; a clean user profile is available; the
   account is a standard user without administrator elevation.
-- **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Extract the
+- **Steps**: 1) Inspect the matching historical release directory and `latest.yml`. 2) Extract the
   portable ZIP to a user-writable directory without running the NSIS installer.
   3) Launch the extracted `PI-Desktop.exe`. 4) Confirm there is no
   administrator prompt and that the running app has the PI-Desktop icon and
@@ -1037,8 +1005,7 @@ for the active release and updater check.
   restore Manual. 6) Invoke Check for Updates. 7) Confirm Settings → Info offers
   the releases page rather than Restart to update. 8) Quit and relaunch the
   extracted executable.
-- **Expected**: Both Windows artifacts are space-free and uploaded. `latest.yml`
-  points at the NSIS installer only. The extracted ZIP app starts without a
+- **Expected**: The historical `latest.yml` identifies its NSIS installer. The extracted ZIP app starts without a
   setup wizard or administrator prompt, keeps the normal PI-Desktop taskbar
   identity/icon, uses the existing application data directory, and reports
   update preference `manual` by default and effective update mode `manual`.
@@ -1114,14 +1081,14 @@ for the active release and updater check.
 
 ## E2E-240: An Intel macOS build on Apple Silicon points at the native download
 
-- **Preconditions**: Apple Silicon Mac; the x64 macOS package installed and
+- **Preconditions**: Apple Silicon Mac; the previous x64-only package installed and
   running under Rosetta 2.
 - **Steps**: 1) Launch the app. 2) Read the banner under the title bar.
   3) Click its dismiss action.
 - **Expected**: The app boots normally. A dismissible hint says this is the
   Intel build on an Apple Silicon machine and asks the user to install the
-  Apple Silicon build. Dismissing hides it for the session; the native arm64
-  package shows no hint.
+  current Universal build. Dismissing hides it for the session; the Universal
+  package running natively shows no hint.
 - **Specs linked**: `03-runtime/07-process-model.md` (boot outcomes)
 - **Acceptance**: B
 - **Milestone**: M3+
@@ -1333,12 +1300,12 @@ Use synthetic Darwin x64/arm64 uname responses through production SSH bootstrap,
 
 ## E2E-IAGENT-release-feed
 
-- Build a matching tag on the fork and verify the Windows ia32/x64 and
-  macOS Intel/Apple Silicon assets belong to that tag.
-- An installed Windows app discovers only its architecture's NSIS update.
-  A macOS manual-install build discovers the manual feed and links to the GitHub
-  Release. A Developer ID-signed build uses the signed ZIP feed and can
-  install the update after restart.
-- Controller coverage runs with the updater and packaging boundaries
-  controlled. A signed installed-app upgrade needs certificates for both
-  releases and a native macOS test machine.
+- Build a matching tag on the fork. Verify exactly one Windows Universal NSIS
+  installer and one macOS Universal DMG. The Windows installer selects an
+  x86 or x64 payload whose Electron and Rust host match the installed OS.
+- The universal Windows release on both architectures discovers the same
+  checksum-verified installer through the GitHub Releases API and can download
+  and schedule it for installation. macOS discovers the DMG and links to the
+  Release page for installation. v0.24.0 requires a manual upgrade.
+- The controller and release-provider tests cover the publish-to-discovery
+  path with fixture installers and a controlled updater.

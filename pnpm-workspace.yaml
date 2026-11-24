@@ -2,6 +2,10 @@ packages:
   - apps/*
   - packages/*
   - docs
+# Universal desktop packaging includes both sets of runtime optional binaries.
+supportedArchitectures:
+  os: [current]
+  cpu: [current, x64, arm64, ia32]
 allowBuilds:
   '@google/genai': true
   electron: true

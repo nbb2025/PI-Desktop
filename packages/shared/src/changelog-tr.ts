@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "Windows için x86 ve x64'ü destekleyen tek bir yükleyici, macOS için Apple Silicon ve Intel'i destekleyen tek bir evrensel DMG sunulur.",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

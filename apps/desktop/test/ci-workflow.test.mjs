@@ -1,8 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { access, mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
@@ -17,7 +14,6 @@ const [
   pluginSdkPackageSource,
   sharedPackageSource,
   releaseMacScriptSource,
-  releaseAsarScriptSource,
 ] = await Promise.all([
   read("../../../.github/workflows/ci.yml"),
   read("../../../.github/workflows/release.yml"),
@@ -28,7 +24,6 @@ const [
   read("../../../packages/plugin-sdk/package.json"),
   read("../../../packages/shared/package.json"),
   read("../../../scripts/release-macos.sh"),
-  read("../../../scripts/export-linux-asar.mjs"),
 ]);
 
 test("CI skips documentation-only pushes and pull requests", () => {
@@ -75,27 +70,18 @@ test("release runners validate tags without a separate job barrier", () => {
   );
 });
 
-test("release preparation overlaps independent work and avoids duplicate builds", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /cargo build --release --locked -p host-core &/,
-  );
-  assert.match(releaseWorkflowSource, /wait "\$host_build_pid"/);
-  assert.match(
-    releaseWorkflowSource,
-    /pnpm --filter '@pi-desktop\/desktop\^\.\.\.' --fail-if-no-match build/,
-  );
-  // The full JS build belongs to the verify gate; the build matrix only
-  // builds the desktop app's workspace dependencies.
+test("release packaging delegates each installer to its platform command", () => {
   const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
   assert.ok(buildJob, "release build job is missing");
-  assert.doesNotMatch(buildJob, /run: pnpm build:js/);
+  assert.match(buildJob, /pnpm --filter @pi-desktop\/desktop run dist:win/);
+  assert.match(buildJob, /pnpm --filter @pi-desktop\/desktop run dist:mac/);
+  assert.doesNotMatch(buildJob, /cargo build|pnpm build:js|electron-builder --/);
 });
 
 test("release builds are gated on the CI checks and least-privilege permissions", () => {
   assert.match(releaseWorkflowSource, /^permissions:\n  contents: read$/m);
   assert.match(releaseWorkflowSource, /^  verify:/m);
-  assert.match(releaseWorkflowSource, /^  build:\n[\s\S]*?^    needs: verify$/m);
+  assert.match(releaseWorkflowSource, /^  build:\n[\s\S]*?^    needs: \[configuration, verify\]$/m);
   const verifyJob = releaseWorkflowSource.match(/^  verify:\n[\s\S]*?(?=^  build:)/m)?.[0];
   assert.ok(verifyJob, "release verify job is missing");
   for (const step of [
@@ -148,51 +134,15 @@ test("manual Linux package validation covers the RPM desktop identity", () => {
   );
 });
 
-test("release workflow publishes the Linux ASAR beside installers", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /if: matrix\.platform == 'linux'[\s\S]*?node scripts\/export-linux-asar\.mjs --arch \$\{\{ matrix\.arch \}\}/,
+test("tag releases only publish desktop installers for Windows and macOS", () => {
+  const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
+  assert.ok(buildJob, "release build job is missing");
+  assert.deepEqual(
+    [...buildJob.matchAll(/- name: (.* Universal)\n/g)].map(([, name]) => name),
+    ["macOS Universal", "Windows Universal"],
   );
-  assert.match(releaseWorkflowSource, /apps\/desktop\/release\/\*\.asar/);
-  assert.match(
-    releaseAsarScriptSource,
-    /linuxUnpackedDirName\(releaseArch\)\}\/resources\/app\.asar/,
-  );
-  assert.match(
-    releaseAsarScriptSource,
-    /PI-Desktop-\$\{releaseVersion\}-linux-\$\{releaseArch\}\.asar/,
-  );
-});
-
-test("the release matrix ships native Linux x64 and arm64 lanes", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /name: Linux arm64[\s\S]*?os: ubuntu-22\.04-arm[\s\S]*?arch: arm64[\s\S]*?runner_arch: aarch64[\s\S]*?artifact: linux-arm64[\s\S]*?platform: linux[\s\S]*?dist: dist:linux/,
-    "the arm64 lane runs on a native arm64 runner",
-  );
-  // A runner that is not the architecture it packages would pair one
-  // architecture's Electron app with the other's Rust sidecar.
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify native runner architecture[\s\S]*?if: matrix\.runner_arch/,
-  );
-  // electron-builder already names each Linux lane's feed after its own
-  // architecture (`latest-linux.yml` on x64, `latest-linux-arm64.yml` on
-  // arm64) — the names electron-updater requests — so the lanes cannot
-  // overwrite each other's feed during the publish merge, and the lane
-  // verifies the name it will publish instead of renaming it.
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify the Linux update feed[\s\S]*?feed="apps\/desktop\/release\/\$\{\{ matrix\.feed \}\}"/,
-  );
-  assert.match(releaseWorkflowSource, /feed: latest-linux\.yml/);
-  assert.match(releaseWorkflowSource, /feed: latest-linux-arm64\.yml/);
-  // The pi-host bundles the SSH bootstrap installs track the desktop's Linux
-  // lanes one for one.
-  assert.match(
-    releaseWorkflowSource,
-    /pi-host-bundle:[\s\S]*?- arch: x64[\s\S]*?os: ubuntu-22\.04[\s\S]*?- arch: arm64[\s\S]*?os: ubuntu-22\.04-arm/,
-  );
+  assert.doesNotMatch(buildJob, /dist:linux|AppImage|\.asar|\.rpm|\.deb|latest-linux|Portable/);
+  assert.doesNotMatch(releaseWorkflowSource, /pi-host-bundle:|pi-host-\*-linux|latest-ia32\.yml|manual-mac\.yml/);
 });
 
 test("the Linux package config lets the workflow choose the architecture", () => {
@@ -216,83 +166,26 @@ test("the Linux package config lets the workflow choose the architecture", () =>
   assert.equal(build.rpm.artifactName, "pi-desktop-${version}-${arch}.${ext}");
 });
 
-test("release matrix packages both native macOS architectures", () => {
+test("release jobs verify both architectures inside their universal installers", () => {
   assert.match(
     releaseWorkflowSource,
-    /name: macOS arm64[\s\S]*?os: macos-15[\s\S]*?arch: arm64[\s\S]*?runner_arch: arm64/,
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /name: macOS Intel x64[\s\S]*?os: macos-15-intel[\s\S]*?arch: x64[\s\S]*?runner_arch: x86_64/,
+    /name: macOS Universal[\s\S]*?rust_targets: x86_64-apple-darwin,aarch64-apple-darwin/,
   );
   assert.match(
     releaseWorkflowSource,
-    /name: Package installers \(\$\{\{ matrix\.dist \}\}\)[\s\S]*?if: matrix\.platform != 'macos'[\s\S]*?run: pnpm --filter @pi-desktop\/desktop run \$\{\{ matrix\.dist \}\} --\$\{\{ matrix\.arch \}\}/,
+    /name: Windows Universal[\s\S]*?rust_targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc/,
   );
-  assert.equal(
-    JSON.parse(desktopPackageSource).build.mac.artifactName,
-    "PI-Desktop-${version}-${arch}-mac.${ext}",
-    "macOS ZIP names include the target architecture",
-  );
-  assert.equal(
-    JSON.parse(desktopPackageSource).build.dmg.artifactName,
-    "PI-Desktop-${version}-${arch}.${ext}",
-    "macOS DMG names include the target architecture",
-  );
+  assert.match(releaseWorkflowSource, /\['win-unpacked', 0x8664\], \['win-ia32-unpacked', 0x14c\]/);
   assert.match(
     releaseWorkflowSource,
-    /Package macOS manual-install bundle[\s\S]*?pnpm --filter @pi-desktop\/desktop run dist:mac --\$\{\{ matrix\.arch \}\}/,
-    "manual-install macOS builds use the shared artifact naming config",
+    /for arch in arm64 x86_64; do\n.*lipo .*Contents\/MacOS\/PI-Desktop" -verify_arch "\$arch"\n.*lipo .*Contents\/Resources\/bin\/pi-desktop-host-core" -verify_arch "\$arch"/,
   );
-  assert.doesNotMatch(
-    releaseWorkflowSource,
-    /-c\.(?:dmg|zip)\.artifactName/,
-    "release workflow does not pass unsupported target overrides",
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /name: Verify macOS artifact names[\s\S]*?Expected exactly one[\s\S]*?Unexpected unlabelled or wrong-architecture macOS artifact/,
-    "macOS publication rejects ambiguous artifact names",
-  );
-  assert.match(
-    releaseWorkflowSource,
-    /latest-mac-\$\{\{ matrix\.arch \}\}\.yml/,
-  );
-  assert.match(releaseWorkflowSource, /Merge macOS updater metadata[\s\S]*?ruby/);
+  assert.match(releaseWorkflowSource, /PI-Desktop-\*-universal\.dmg/);
+  assert.match(releaseWorkflowSource, /PI-Desktop-Setup-\*\.exe/);
+  assert.doesNotMatch(releaseWorkflowSource, /-c\.(?:dmg|zip)\.artifactName/);
 });
 
-test("release input preparation works with Bash for native and i686 builds", {
-  skip: process.platform === "win32" ? "requires /bin/bash" : false,
-}, async (context) => {
-  const script = releaseWorkflowSource.match(
-    /- name: Prepare package inputs[\s\S]*?run: \|\n([\s\S]*?)\n      - name:/,
-  )?.[1];
-  assert.ok(script);
-  const cwd = await mkdtemp(join(tmpdir(), "pi-release-inputs-"));
-  context.after(() => rm(cwd, { recursive: true, force: true }));
-  const commands = `
-    cargo() {
-      printf '%s\\n' "$*"
-      if [[ -n "$RUST_TARGET" ]]; then
-        mkdir -p "target/$RUST_TARGET/release"
-        printf 'fixture' > "target/$RUST_TARGET/release/pi-desktop-host-core.exe"
-      fi
-    }
-    pnpm() { return 0; }
-  `;
-  for (const target of ["", "i686-pc-windows-msvc"]) {
-    const args = target ? ` --target ${target}` : "";
-    const calls = execFileSync("/bin/bash", ["-c", `${commands}\n${script}`], {
-      cwd,
-      env: { ...process.env, RUST_TARGET: target },
-      encoding: "utf8",
-    });
-    assert.equal(calls.trim(), `build --release --locked -p host-core${args}`);
-  }
-  assert.equal(await readFile(join(cwd, "target/release/pi-desktop-host-core.exe"), "utf8"), "fixture");
-});
-
-test("macOS automatic updates require the signed release lane", () => {
+test("macOS Developer ID signing retains the notarization and watchdog requirements", () => {
   assert.match(
     releaseWorkflowSource,
     /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
@@ -310,13 +203,11 @@ test("macOS automatic updates require the signed release lane", () => {
   assert.match(manualBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
   assert.match(manualBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
   assert.match(manualBlock, /-c\.mac\.identity=-/);
-  assert.match(manualBlock, /codesign --verify --deep --strict/);
+  assert.match(releaseWorkflowSource, /codesign --verify --deep --strict/);
   assert.doesNotMatch(manualBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
   assert.doesNotMatch(manualBlock, /forceCodeSigning|notarize/);
 
   assert.match(releaseWorkflowSource, /Incomplete macOS signing configuration/);
-  assert.match(releaseWorkflowSource, /File.write\("manual-mac\.yml", merged\.to_yaml\)/);
-  assert.match(releaseWorkflowSource, /File.write\("latest-mac\.yml", merged\.to_yaml\) if ENV\["MACOS_SIGN_RELEASE"\] == "true"/);
 
   const signedBlock = releaseWorkflowSource.match(
     /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
@@ -332,7 +223,7 @@ test("macOS automatic updates require the signed release lane", () => {
   ]) {
     assert.match(signedBlock, new RegExp(`${secret}:\\s*\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`));
   }
-  assert.match(signedBlock, /-c\.extraMetadata\.piMacUpdates=true/);
+  assert.doesNotMatch(signedBlock, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
   assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
@@ -353,7 +244,7 @@ test("macOS automatic updates require the signed release lane", () => {
   assert.match(signedBlock, /PI_STAPLER_RETRY_DELAY_SECONDS: "10"/);
   assert.match(
     signedBlock,
-    /node scripts\/macos-signing-watchdog\.mjs \\\n\s+--label "dist:mac-\$\{\{ matrix\.arch \}\}" \\\n\s+-- pnpm --filter @pi-desktop\/desktop run dist:mac/,
+    /node scripts\/macos-signing-watchdog\.mjs \\\n\s+--label "dist:mac-universal" \\\n\s+-- pnpm --filter @pi-desktop\/desktop run dist:mac/,
     "the signed macOS packaging phase runs under the signing watchdog",
   );
   // electron-builder notarizes only the .app; the DMG needs its own
@@ -391,12 +282,9 @@ test("macOS automatic updates require the signed release lane", () => {
   assert.doesNotMatch(releaseWorkflowSource, /scripts\/staple-macos-release-dmg\.sh/);
 });
 
-test("the signed local macOS lane selects the native runner architecture", () => {
-  assert.match(releaseMacScriptSource, /DEFAULT_MAC_ARCH/);
-  assert.match(releaseMacScriptSource, /MAC_ARCH="\$\{MAC_ARCH:-\$DEFAULT_MAC_ARCH\}"/);
-  assert.match(releaseMacScriptSource, /must match the host/);
-  assert.match(releaseMacScriptSource, /electron-builder --mac "--\$\{MAC_ARCH\}"/);
-  assert.match(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
+test("the signed local macOS lane uses the universal packaging command", () => {
+  assert.match(releaseMacScriptSource, /run dist:mac /);
+  assert.doesNotMatch(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.match(
     releaseMacScriptSource,
     /MAC_SIGNING_IDENTITY="\$\{MAC_SIGNING_IDENTITY#Developer ID Application: \}"/,
@@ -411,7 +299,6 @@ test("the signed local macOS lane selects the native runner architecture", () =>
   // notarization, so it must pass both flags and must not publish.
   assert.match(releaseMacScriptSource, /-c\.mac\.notarize=true/);
   assert.match(releaseMacScriptSource, /-c\.mac\.forceCodeSigning=true/);
-  assert.match(releaseMacScriptSource, /--publish never/);
   assert.doesNotMatch(
     releaseMacScriptSource,
     /DEBUG="\$\{DEBUG:-[^}]*electron-builder/,
@@ -419,7 +306,7 @@ test("the signed local macOS lane selects the native runner architecture", () =>
   );
   assert.match(
     releaseMacScriptSource,
-    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-\$\{MAC_ARCH\}" --/,
+    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-universal" --/,
     "the local signed macOS lane runs under the signing watchdog",
   );
   assert.match(
@@ -471,9 +358,9 @@ test("macOS signing instrumentation stays out of the Windows and Linux lanes", (
   const stepBlock = (name) =>
     releaseWorkflowSource.match(new RegExp(`- name: ${name}[^]*?(?=\\n      - name:)`))?.[0] ??
     "";
-  assert.doesNotMatch(stepBlock("Package installers"), instrumentation);
-  assert.doesNotMatch(stepBlock("Verify Linux host-core glibc floor"), instrumentation);
-  assert.doesNotMatch(stepBlock("Export Linux ASAR release asset"), instrumentation);
+  const windowsBlock = stepBlock("Package universal Windows installer");
+  assert.ok(windowsBlock, "Windows package step is missing");
+  assert.doesNotMatch(windowsBlock, instrumentation);
   const manualBlock = stepBlock("Package macOS manual-install bundle");
   assert.ok(manualBlock, "macOS manual-install package step is missing");
   assert.doesNotMatch(manualBlock, instrumentation);
