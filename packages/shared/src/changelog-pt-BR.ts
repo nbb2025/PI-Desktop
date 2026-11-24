@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "O Windows usa um único instalador para x86 e x64, e o macOS usa um DMG universal para Apple Silicon e Intel.",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

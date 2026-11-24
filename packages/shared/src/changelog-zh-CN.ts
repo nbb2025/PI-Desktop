@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "Windows 的 x86 和 x64 版本统一使用一个安装包，macOS 的 Apple 芯片和 Intel 版本统一使用一个通用 DMG。",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

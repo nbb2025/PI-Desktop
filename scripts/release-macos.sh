@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release build for native macOS: Developer ID-signed and notarized DMG/ZIP.
+# Release build for macOS: Developer ID-signed and notarized universal DMG/ZIP.
 #
 # Local builds without a certificate remain unsigned. This script injects a
 # real signing identity and requires notarization credentials:
@@ -10,7 +10,6 @@
 #   APPLE_ID               Apple ID email for notarization
 #   APPLE_APP_SPECIFIC_PASSWORD  app-specific password for the Apple ID
 #   APPLE_TEAM_ID          Apple Developer Team ID matching the certificate
-#   MAC_ARCH               optional `arm64` or `x64`; must match the host
 #
 # Observability: the packaging command runs under
 # scripts/macos-signing-watchdog.mjs, which enables the per-file signing trace
@@ -32,29 +31,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 1
 fi
 
-case "$(uname -m)" in
-  arm64) DEFAULT_MAC_ARCH=arm64 ;;
-  x86_64) DEFAULT_MAC_ARCH=x64 ;;
-  *)
-    echo "error: unsupported macOS runner architecture: $(uname -m)." >&2
-    exit 1
-    ;;
-esac
-
-MAC_ARCH="${MAC_ARCH:-$DEFAULT_MAC_ARCH}"
-case "$MAC_ARCH" in
-  arm64|x64) ;;
-  *)
-    echo "error: MAC_ARCH must be arm64 or x64 (got: $MAC_ARCH)." >&2
-    exit 1
-    ;;
-esac
-
-if [[ "$MAC_ARCH" != "$DEFAULT_MAC_ARCH" ]]; then
-  echo "error: MAC_ARCH=$MAC_ARCH requires a native $MAC_ARCH macOS runner; this host is $DEFAULT_MAC_ARCH." >&2
-  exit 1
-fi
-
 MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY:?Set the Developer ID Application identity}"
 MAC_SIGNING_IDENTITY="${MAC_SIGNING_IDENTITY#Developer ID Application: }"
 export APPLE_TEAM_ID="${APPLE_TEAM_ID:?Set the Developer ID team ID}"
@@ -70,20 +46,8 @@ if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
   exit 1
 fi
 
-echo "==> Building host-core (release)"
-cargo build -p host-core --release
-
-echo "==> Building workspace packages"
-pnpm -r --filter '!@pi-desktop/desktop' build
-
-echo "==> Bundling the agent-runtime sidecar"
-pnpm --filter @pi-desktop/agent-runtime bundle
-
-echo "==> Building the desktop bundles"
-pnpm --filter @pi-desktop/desktop exec electron-vite build
-
-echo "==> Packaging the desktop (Developer ID signed + notarized, $MAC_ARCH)"
-# `--publish never` keeps a local checkout from publishing to GitHub; the
+echo "==> Packaging the universal desktop (Developer ID signed + notarized)"
+# The packaging wrapper uses `--publish never`; the
 # Release workflow owns publication. The watchdog is transparent: it forwards
 # every line, keeps the child's exit code, and only fails on its own timeout.
 # `electron-builder` is intentionally absent from DEBUG: builder-util's
@@ -93,9 +57,8 @@ echo "==> Packaging the desktop (Developer ID signed + notarized, $MAC_ARCH)"
 PI_STAPLER_MAX_ATTEMPTS="${PI_STAPLER_MAX_ATTEMPTS:-6}" \
 PI_STAPLER_RETRY_DELAY_SECONDS="${PI_STAPLER_RETRY_DELAY_SECONDS:-10}" \
 DEBUG="${DEBUG:-electron-osx-sign*,electron-notarize*}" \
-  node scripts/macos-signing-watchdog.mjs --label "release-macos-${MAC_ARCH}" -- \
-  pnpm --filter @pi-desktop/desktop exec electron-builder --mac "--${MAC_ARCH}" \
-    --publish never \
+  node scripts/macos-signing-watchdog.mjs --label "release-macos-universal" -- \
+  pnpm --filter @pi-desktop/desktop run dist:mac --signed-macos \
     -c.extraMetadata.piMacUpdates=true \
     -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
     -c.mac.forceCodeSigning=true \
@@ -109,5 +72,7 @@ scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
 
 echo "==> Verifying the signed and notarized release"
 scripts/verify-macos-release.sh apps/desktop/release
+
+node scripts/write-macos-update-feed.mjs apps/desktop/release
 
 echo "==> Done. Artifacts in apps/desktop/release/"

@@ -285,7 +285,8 @@ test("packaging publishes an electron-updater feed for GitHub Releases", async (
     updaterCacheDirName: `${pkg.name.replaceAll("/", "")}-updater`,
   });
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
-  assert.ok(macTargets.includes("zip"), "mac zip target (Squirrel.Mac feed)");
+  assert.deepEqual(macTargets, ["dmg"]);
+  assert.match(buildReleaseSource, /signedMac \? \["zip"\] : \[\]/);
   // electron-builder must never self-publish (implicit tag publishing would
   // fail on the missing token and race the softprops release step).
   for (const script of ["dist:mac", "dist:win", "dist:linux"]) {
@@ -319,32 +320,25 @@ test("packaging publishes an electron-updater feed for GitHub Releases", async (
   );
   // GitHub asset URLs mangle spaces; keep Windows artifact names space-free.
   assert.equal(pkg.build.nsis.artifactName, "PI-Desktop-Setup-${version}.${ext}");
-  const winTargets = pkg.build.win.target.map((entry) => entry.target);
-  assert.deepEqual(winTargets, ["nsis", "zip", "portable"], "Windows release targets");
-  assert.equal(pkg.build.portable.artifactName, "PI-Desktop-Portable-${version}.${ext}", "portable artifact name");
-  assert.equal(
-    pkg.build.win.artifactName,
-    "PI-Desktop-Portable-${version}.${ext}",
-  );
+  assert.deepEqual(pkg.build.win.target, [{ target: "nsis", arch: ["x64", "ia32"] }]);
+  assert.equal(pkg.build.nsis.buildUniversalInstaller, true);
   assert.equal(pkg.build.extraMetadata.piDistribution, "installed");
   assert.match(pkg.scripts["dist:win"], /build-desktop-release\.mjs win/);
-  assert.match(buildReleaseSource, /"--win",\s*"nsis"/);
-  assert.match(buildReleaseSource, /"--win",\s*"zip"/);
-  assert.match(buildReleaseSource, /"--win",\s*"portable"/);
-  assert.match(buildReleaseSource, /piDistribution=portable/);
+  assert.match(buildReleaseSource, /"--win",\s*"nsis",\s*"--x64",\s*"--ia32"/);
   assert.match(buildReleaseSource, /"--publish",\s*"never"/);
-  assert.match(buildReleaseSource, /piDistribution=installed/);
-  assert.match(buildReleaseSource, /piDistribution=zip/);
+  assert.match(
+    buildReleaseSource,
+    /copyFile\("release\/latest\.yml", "release\/latest-ia32\.yml"\)/,
+    "the 32-bit updater finds the same universal installer",
+  );
   assert.match(
     buildReleaseSource,
     /shell:\s*process\.platform === "win32"/,
     "Windows must launch the pnpm.cmd shim through a shell",
   );
-  // The upload step must carry every updater feed, and the release publishes
-  // all platforms unfiltered (D126/D285).
-  assert.match(releaseWorkflowSource, /release\/\*\.zip/);
-  assert.match(releaseWorkflowSource, /release\/\*\.rpm/);
-  assert.match(releaseWorkflowSource, /release\/latest\*\.yml/);
+  for (const feed of ["latest.yml", "latest-ia32.yml", "manual-mac.yml", "latest-mac.yml"]) {
+    assert.ok(releaseWorkflowSource.includes(`apps/desktop/release/${feed}`));
+  }
   assert.match(releaseWorkflowSource, /files: dist\/\*/);
 });
 

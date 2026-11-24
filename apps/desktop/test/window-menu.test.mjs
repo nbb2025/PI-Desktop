@@ -398,25 +398,17 @@ test("macOS activation resurfaces a tray-hidden window", () => {
 });
 
 test("desktop packaging builds the native host before every local target", () => {
-  assert.match(
-    packageJson.scripts["build:host-release"],
-    /cargo build --release .* -p host-core/,
-  );
-  for (const name of ["pack", "dist", "dist:mac", "dist:win", "dist:linux"]) {
-    const script = packageJson.scripts[name];
-    assert.match(script, /pnpm run build:host-release/);
-    const packagingCommand = script.includes("build-desktop-release.mjs")
-      ? "build-desktop-release.mjs"
-      : "electron-builder";
-    assert.ok(
-      script.indexOf("pnpm run build:host-release") < script.indexOf(packagingCommand),
-      `${name} must build the native host before the packaging command`,
-    );
+  assert.match(packageJson.scripts["build:host-release"], /prepare-desktop-host\.mjs/);
+  assert.match(packageJson.scripts.pack, /build:host-release.*electron-builder --dir/);
+  for (const name of ["dist", "dist:mac", "dist:win", "dist:linux"]) {
+    assert.match(packageJson.scripts[name], /build-desktop-release\.mjs/, name);
   }
-  assert.ok(
-    packageJson.build.win.extraResources.some(
-      ({ to }) => to === "bin/pi-desktop-host-core.exe",
-    ),
+  assert.deepEqual(
+    packageJson.build.win.extraResources.find(({ to }) => to === "bin/pi-desktop-host-core.exe"),
+    {
+      from: "../../target/desktop-release/${arch}/pi-desktop-host-core.exe",
+      to: "bin/pi-desktop-host-core.exe",
+    },
   );
   assert.equal(packageJson.build.linux.extraResources[0].to, "bin/pi-desktop-host-core");
   assert.equal(packageJson.build.mac.extraResources[0].to, "bin/pi-desktop-host-core");

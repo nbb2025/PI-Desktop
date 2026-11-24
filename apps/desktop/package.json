@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.24.0",
+  "version": "0.24.1",
   "desktopName": "pi-desktop.desktop",
   "private": true,
   "description": "PI-Desktop Electron application",
@@ -26,13 +26,13 @@
     "test": "node --test test/*.test.mjs",
     "lint": "node ../../scripts/check-style-tokens.mjs",
     "clean": "node -e \"fs.rmSync('out',{recursive:true,force:true});fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build:host-release": "cargo build --release --manifest-path ../../Cargo.toml -p host-core",
+    "build:host-release": "node ../../scripts/prepare-desktop-host.mjs",
     "bundle:runtime": "pnpm -C ../../packages/agent-runtime bundle",
     "pack": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --dir",
-    "dist": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs",
-    "dist:mac": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --mac --publish never",
-    "dist:win": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
-    "dist:linux": "pnpm run build:deps && pnpm run build:host-release && pnpm run bundle:runtime && electron-vite build && electron-builder --linux --publish never"
+    "dist": "pnpm run build:deps && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs",
+    "dist:mac": "pnpm run build:deps && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs mac",
+    "dist:win": "pnpm run build:deps && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs win",
+    "dist:linux": "pnpm run build:deps && pnpm run bundle:runtime && electron-vite build && node ../../scripts/build-desktop-release.mjs linux"
   },
   "dependencies": {
     "@picovoice/pvrecorder-node": "1.2.9",
@@ -161,9 +161,6 @@
       "target": [
         {
           "target": "dmg"
-        },
-        {
-          "target": "zip"
         }
       ],
       "category": "public.app-category.developer-tools",
@@ -189,7 +186,8 @@
           "from": "build/tray-icon-mac.png",
           "to": "tray-icon-mac.png"
         }
-      ]
+      ],
+      "x64ArchFiles": "**/app.asar.unpacked/node_modules/{@transcribe-cpp,@koromix,@picovoice}/**"
     },
     "dmg": {
       "artifactName": "PI-Desktop-${version}-${arch}.${ext}",
@@ -212,28 +210,17 @@
           "type": "link",
           "path": "/Applications"
         }
-      ]
+      ],
+      "writeUpdateInfo": false
     },
     "win": {
       "executableName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}",
       "target": [
         {
           "target": "nsis",
           "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
+            "x64",
+            "ia32"
           ]
         }
       ],
@@ -244,7 +231,7 @@
           "to": "app-update.yml"
         },
         {
-          "from": "../../target/release/pi-desktop-host-core.exe",
+          "from": "../../target/desktop-release/${arch}/pi-desktop-host-core.exe",
           "to": "bin/pi-desktop-host-core.exe"
         },
         {
@@ -257,10 +244,8 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "PI-Desktop",
-      "artifactName": "PI-Desktop-Setup-${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "PI-Desktop-Portable-${version}.${ext}"
+      "artifactName": "PI-Desktop-Setup-${version}.${ext}",
+      "buildUniversalInstaller": true
     },
     "deb": {
       "packageName": "pi-desktop",

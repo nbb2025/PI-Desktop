@@ -30,7 +30,7 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 | `macos-signing-watchdog.mjs` | `node scripts/macos-signing-watchdog.mjs [options] -- <command>` | Run a long silent phase (`electron-builder` signing, `notarytool submit --wait`) with a heartbeat, phase tracking, stall diagnostics (last file, `ps` state, codesign log tail), per-file codesign timings, optional bounded app stapler retries, and a hard timeout that fails instead of hanging; it forwards the child output and exit code unchanged and redacts `CSC_KEY_PASSWORD`/`APPLE_APP_SPECIFIC_PASSWORD`/`CSC_LINK` values plus `--password` arguments |
 | `macos-codesign-shim.sh` | used by `macos-signing-watchdog.mjs` | PATH shim that timestamps every `codesign` invocation and then executes the real `codesign`; inert unless `PI_CODESIGN_LOG` is set |
 | `export-linux-asar.mjs` | `node scripts/export-linux-asar.mjs` | Copy the Linux `linux-unpacked/resources/app.asar` into the versioned release asset used for system-Electron repackaging |
-| `build-desktop-release.mjs` | called by the desktop `dist` / `dist:win` scripts | Build the native runner target without publishing; Windows runs separate NSIS and ZIP passes and stamps their updater distribution metadata |
+| `build-desktop-release.mjs` | called by the desktop `dist` / `dist:win` scripts | Package the native runner target without publishing. Windows and macOS each use a single universal installer |
 | `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35 |
 | `make-icon.py` | `python3 scripts/make-icon.py` | Derive the package PNG, the macOS tray template, and the iconset/ICNS from the canonical PNG |
 | `publish-screenshots.py` | `python3 scripts/publish-screenshots.py` | Publish documentation screenshots |
@@ -119,17 +119,12 @@ version explicitly supplied for a prerelease preview.
 
 `.github/workflows/release.yml` builds on a `v*.*.*` tag. A `verify` job first
 repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the
-build matrix waits for it. Each platform runner then
-validates the tag against `apps/desktop/package.json` before packaging, then
-runs the native `dist:mac`, `dist:win`, or `dist:linux` command. The Linux
-job uses Ubuntu 22.04 so host-core stays on glibc 2.35, then
-`scripts/check-linux-host-glibc.mjs` refuses a binary that needs a newer
-glibc. Each Linux runner (native x64 and arm64) also exports the exact
-app.asar from its own unpacked tree as a versioned release asset; the macOS
-matrix covers arm64 and Intel x64 and
-the publish job assembles the GitHub Release. Tag builds Developer ID-sign,
-notarize, and staple macOS artifacts; `workflow_dispatch` may set
-`sign_macos: false` only for unsigned debug artifacts. See the [release
+build jobs wait for it. The Windows and macOS runners validate the tag against
+`apps/desktop/package.json` and produce one universal installer each. The
+two Linux jobs build the SSH host archives on Ubuntu 22.04 and check the
+glibc 2.35 floor. A tag publishes the installers, updater files, and SSH host
+archives. A manual dispatch retains Actions artifacts. The signed macOS lane
+requires Developer ID and notarization credentials. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 
 ### Packaged startup regression

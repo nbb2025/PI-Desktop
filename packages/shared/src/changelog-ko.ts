@@ -2,6 +2,13 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.24.1",
+    date: "2026-11-24",
+    highlights: [
+      "Windows는 x86과 x64에 공통 설치 프로그램 하나를 사용하며, macOS는 Apple Silicon과 Intel에 공통 유니버설 DMG를 사용합니다.",
+    ],
+  },
+  {
     version: "0.24.0",
     date: "2026-11-24",
     highlights: [

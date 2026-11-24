@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,6 +27,7 @@ const LANE_SCRIPTS = [
   "macos-codesign-shim.sh",
   "macos-stapler-retry-shim.sh",
   "macos-bundle-inventory.mjs",
+  "write-macos-update-feed.mjs",
 ];
 const SIGNING_IDENTITY = "Developer ID Application: Fixture Publisher (ABCDE12345)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
@@ -33,21 +35,17 @@ const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
 async function writeStubs(bin, log, repoRoot) {
   await mkdir(bin, { recursive: true });
   const stubs = {
-    cargo: `#!/usr/bin/env bash
-printf 'cargo %s\\n' "$*" >> "${log}"
-exit 0
-`,
     // The lane's only job here is to call the toolchain in the documented
     // order; the packaging stub produces the artifacts the later steps expect.
     pnpm: `#!/usr/bin/env bash
 printf 'pnpm %s\\n' "$*" >> "${log}"
 case "$*" in
-  *electron-builder*)
-    app="${repoRoot}/apps/desktop/release/mac-arm64/PI-Desktop.app"
+  *'run dist:mac'*)
+    app="${repoRoot}/apps/desktop/release/mac-universal/PI-Desktop.app"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/bin"
     : > "$app/Contents/MacOS/PI-Desktop"
     : > "$app/Contents/Resources/bin/pi-desktop-host-core"
-    : > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-arm64.dmg"
+    printf 'disk image' > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-universal.dmg"
     ;;
 esac
 exit 0
@@ -73,6 +71,9 @@ case "$1 $2" in
     echo "  id: ${SUBMISSION_ID}"
     echo "  status: Accepted"
     ;;
+  "stapler staple")
+    printf ' with a stapled ticket' >> "$3"
+    ;;
 esac
 exit 0
 `,
@@ -84,7 +85,7 @@ exit 0
 }
 
 test(
-  "the signed local macOS lane runs electron-builder with every documented flag",
+  "the signed local macOS lane packages the universal installer and notarizes the DMG",
   { skip: process.platform !== "darwin" ? "macOS-only lane" : false },
   async (t) => {
     const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-lane-"));
@@ -95,6 +96,7 @@ test(
     const log = join(root, "calls.log");
     await mkdir(join(repoRoot, "scripts"), { recursive: true });
     await mkdir(join(repoRoot, "apps/desktop"), { recursive: true });
+    await writeFile(join(repoRoot, "apps/desktop/package.json"), '{"version":"0.0.0"}');
     for (const name of LANE_SCRIPTS) {
       await cp(new URL(name, scripts), join(repoRoot, "scripts", name));
     }
@@ -117,10 +119,10 @@ test(
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     const calls = (await readFile(log, "utf8")).trim().split("\n");
 
-    const builderCall = calls.find((line) => line.includes("electron-builder"));
-    assert.ok(builderCall, "the lane invokes electron-builder");
-    assert.match(builderCall, /--mac --(?:arm64|x64)/);
-    assert.match(builderCall, /--publish never/);
+    const builderCall = calls.find((line) => line.includes("run dist:mac"));
+    assert.ok(builderCall, "the lane invokes the shared packaging command");
+    assert.match(builderCall, /run dist:mac --signed-macos/);
+    assert.match(builderCall, /-c\.extraMetadata\.piMacUpdates=true/);
     assert.match(
       await readFile(join(repoRoot, "scripts", "release-macos.sh"), "utf8"),
       /PI_STAPLER_MAX_ATTEMPTS="\$\{PI_STAPLER_MAX_ATTEMPTS:-6\}"/,
@@ -149,6 +151,17 @@ test(
       1,
       "one DMG submission",
     );
+    const releaseDir = join(repoRoot, "apps/desktop/release");
+    const manualFeed = JSON.parse(await readFile(join(releaseDir, "manual-mac.yml"), "utf8"));
+    assert.equal(manualFeed.version, "0.0.0");
+    const dmg = "PI-Desktop-0.0.0-universal.dmg";
+    const stapled = "disk image with a stapled ticket";
+    assert.equal(await readFile(join(releaseDir, dmg), "utf8"), stapled);
+    assert.deepEqual(manualFeed.files, [{
+      url: dmg,
+      size: Buffer.byteLength(stapled),
+      sha512: createHash("sha512").update(stapled).digest("base64"),
+    }]);
 
     // The packaging phase stays wrapped, and the watchdog reports its summary.
     assert.match(result.stdout, /\[sign\] summary label=release-macos-/);

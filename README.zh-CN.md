@@ -565,41 +565,20 @@ Agent / Plan / Goal
 
 ### [下载 PI-Desktop →](https://github.com/nbb2025/PI-Desktop/releases/latest)
 
-**macOS · Windows · Linux**
+**macOS · Windows**
 
 </div>
 
 ### 安装包
 
-| Platform | Architecture  | Package                                 |
-| -------- | ------------- | --------------------------------------- |
-| macOS    | Apple Silicon | `.dmg` / `.zip`                         |
-| macOS    | Intel         | `.dmg` / `.zip`                         |
-| Windows | x86 / x64 | NSIS 安装包（x64 也提供 ZIP） |
-| Linux    | x64 / ARM64   | `.AppImage` / `.deb` / `.rpm` / `.asar` |
+| 系统 | 支持架构 | 安装包 |
+| ---- | -------- | ------ |
+| macOS | Apple 芯片和 Intel | 通用 DMG |
+| Windows | x86 和 x64 | 通用 EXE |
 
-macOS 在配置 Developer ID 和 Apple 公证后支持应用内安装更新。手动安装版可在应用内检查更新并打开下载页。
+Windows 安装包自动选择对应架构，支持应用内更新。macOS 可在应用内检查新版并下载安装包，配置 Developer ID 并完成 Apple 公证后可在应用内安装更新。
 
-<details>
-<summary><strong>Linux Compatibility</strong></summary>
-
-<br />
-
-Linux 软件包（x64 与 arm64）需要 **glibc 2.35+**。
-
-常见支持版本：
-
-* Ubuntu 22.04+
-* Debian 12+
-* Fedora 36+
-
-检查当前版本：
-
-```bash
-ldd --version
-```
-
-</details>
+Linux 桌面包可按[发布手册](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages)本地构建。发布页中的 `pi-host` 文件用于 SSH 远程工作区。
 
 ---
 

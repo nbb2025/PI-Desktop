@@ -1,8 +1,7 @@
 # 06. Desktop Release Runbook
 
-> Scope: D126/D285/D603 tag artifacts for macOS arm64 and Intel x64, Windows x86/x64,
-> and Linux x64 and arm64, including the Linux system-Electron ASAR assets;
-> macOS signing/notarization remains the detailed qualification lane below.
+> Scope: iAgent tag assets for macOS Universal and Windows Universal,
+> updater files, and Linux `pi-host` archives for SSH workspaces.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
 ## 1. Build lanes
@@ -49,8 +48,9 @@ when macOS `iconutil` is available, without overwriting the canonical source.
    the iAgent publisher and Apple notarization credentials for the same team.
 2. For local signing, set `MAC_SIGNING_IDENTITY` to your certificate common
    name and set `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
-3. Use the native Rust and Electron architecture on macOS. Windows x86 uses
-   the `i686-pc-windows-msvc` Rust target on the x64 runner.
+3. Install both Rust targets for the runner OS before packaging. macOS uses
+   `aarch64-apple-darwin` and `x86_64-apple-darwin`; Windows uses
+   `i686-pc-windows-msvc` and `x86_64-pc-windows-msvc`.
 
 ## 3. What the build ships
 
@@ -191,11 +191,9 @@ export APPLE_TEAM_ID=...
 scripts/release-macos.sh
 ```
 
-Artifacts land in `apps/desktop/release/` (DMG + ZIP + blockmaps).
-
-`scripts/release-macos.sh` defaults to the host architecture and accepts
-`MAC_ARCH=arm64` or `MAC_ARCH=x64` only when that architecture matches the
-host. This keeps the native Rust host sidecar and Electron package aligned.
+Artifacts land in `apps/desktop/release/`. The local signed lane produces
+one Universal DMG, the updater ZIP and feed, and a manual feed describing the
+stapled DMG.
 
 ### 4.3 GitHub tag and manual workflow
 
@@ -206,22 +204,21 @@ the workspace before the native packaging matrix, then publishes the complete
 set of artifacts and updater metadata. A manual workflow dispatch builds
 artifacts without publishing a release.
 
-Windows x64 keeps the NSIS, ZIP, and portable executables. Windows x86 ships
-`PI-Desktop-Setup-<version>-ia32.exe` with its matching i686 host core.
-The pipeline checks the PE machine type of both binaries. Windows NSIS
-installers discover updates through `latest.yml` on x64 and
-`latest-ia32.yml` on x86. Native voice libraries that only ship Windows
-x64 binaries are unavailable on x86.
+Windows publishes `PI-Desktop-Setup-<version>.exe`. The installer carries
+both x86 and x64 Electron apps with their matching Rust host cores and
+chooses the compatible one during installation. The workflow verifies both
+PE machine types. `latest.yml` and `latest-ia32.yml` reference the same
+installer and preserve upgrades from both older Windows packages. Native
+voice libraries that only ship Windows x64 binaries require an x64 app.
 
-macOS uses native arm64 and Intel x64 runners, with a matching Rust host core.
-The workflow selects Developer ID signing when all five repository secrets
-are available and rejects incomplete configurations. A tag with no signing
-credentials can publish manual-install DMG/ZIP assets and `manual-mac.yml`.
-That lane seals the application bundle with an ad-hoc signature and verifies
-its integrity before upload. It uses in-app discovery and links to the download
-page. Developer ID release bundles carry the in-app installation flag and publish
-`latest-mac.yml` in addition to the manual feed. Downloadable ZIPs in the
-merged feeds are hashed and kept architecture-specific.
+macOS publishes `PI-Desktop-<version>-universal.dmg`. The macOS runner builds
+both Rust targets and combines them with `lipo`. Electron Builder merges the
+two Electron architectures. Both the app executable and its Rust host must
+contain arm64 and x86_64. The workflow selects Developer ID signing when all
+five repository secrets are available and rejects incomplete configurations.
+A tag with all five absent produces an ad-hoc-signed DMG for manual
+installation. `manual-mac.yml` hashes the final DMG. The signed lane adds a
+Universal ZIP and `latest-mac.yml` for in-app installation.
 
 For the signed lane, electron-builder signs and notarizes the application.
 The DMG then receives separate notarization and stapling. Before upload,
@@ -238,39 +235,19 @@ only after Apple accepts the matching submission. Retries fail the job if the
 limit is exhausted, and artifact verification still requires valid stapled
 tickets on the app and DMG.
 
-The shared electron-builder configuration applies the architecture-labelled
-pattern at the macOS platform level for ZIPs and overrides it at the DMG target
-level. Both public architectures are therefore explicit: the arm64 lane
-publishes `PI-Desktop-<version>-arm64.dmg` and
-`PI-Desktop-<version>-arm64-mac.zip`, while the Intel x64 lane publishes
-`PI-Desktop-<version>-x64.dmg` and `PI-Desktop-<version>-x64-mac.zip`. This
-applies to both macOS release lanes, including local release builds,
-and ensures each generated updater feed references its architecture-labelled
-asset names and matching checksums. Before upload, each macOS runner requires
-exactly one architecture-labelled DMG and ZIP (including blockmaps) and rejects
-any unlabelled or wrong-architecture macOS artifact.
-
 The DMG uses a branded 720×440 background with a two-icon drag-to-Applications
 gesture. The app and Applications link are the only items in the window.
 
-The macOS ZIP contains `PI-Desktop.app` at its root. Neither the DMG nor ZIP
+The signed macOS updater ZIP contains `PI-Desktop.app` at its root. Neither the DMG nor ZIP
 ships an opening-help note or executable first-launch helper, including local
 and manual-install builds. Apple Gatekeeper qualification requires Developer ID
 signing and notarization.
 
-DMG, ZIP, NSIS, AppImage, deb, rpm, blockmap, and updater feed outputs are already
-compressed or compression-insensitive. The workflow therefore uploads their
-temporary Actions artifacts with compression level zero before the publish job
-assembles the GitHub Release. The Linux runners also copy their unpacked
-`resources/app.asar` (`linux-unpacked` on x64, `linux-arm64-unpacked` on arm64)
-to the versioned `PI-Desktop-<version>-linux-<arch>.asar` asset before upload.
-This preserves the exact archive used by the Linux installers for downstream
-repackaging with a system Electron.
-
-The Linux updater feeds carry the architecture they were built for:
-`latest-linux.yml` for x64 and `latest-linux-arm64.yml` for arm64. Those are the
-channel files `electron-updater` requests on the matching architecture, so a
-lane fails before upload if its own feed is missing.
+The workflow uploads the installers and their updater files as temporary
+Actions artifacts with compression level zero. It also publishes the two
+version-matched Linux `pi-host` archives and their checksums for SSH workspace
+bootstrap. Desktop Linux packages are available through local or manually
+dispatched validation builds.
 
 ### 4.4 Release and feedback URLs
 
@@ -377,9 +354,8 @@ above.
 
 ## 5. Verification gates
 
-Unsigned debug artifacts (`workflow_dispatch` with `sign_macos: false`) are
-not Gatekeeper-qualified. Tag releases must pass the signature, notarization,
-and staple checks below or the workflow fails.
+The manual-install lane requires a valid ad-hoc signature. The Developer ID
+lane must pass the signature, notarization, and staple checks below.
 
 Two separate notarization submissions exist, because Apple notarizes one
 artifact per submission and electron-builder only covers the app:
@@ -387,7 +363,7 @@ artifact per submission and electron-builder only covers the app:
 | Artifact | Submitted by | Ticket |
 |---|---|---|
 | `PI-Desktop.app` (inside the ZIP) | electron-builder `-c.mac.notarize=true` | stapled and validated by electron-builder through the watchdog's bounded stapler retry shim |
-| `PI-Desktop-<version>-<arch>.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled and validated by the same script after `status: Accepted` |
+| `PI-Desktop-<version>-universal.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled and validated by the same script after `status: Accepted` |
 
 A DMG that was never submitted has no ticket, so stapling it fails with
 `Could not find base64 encoded ticket ... Error 65`. Stapler retries are only
@@ -543,62 +519,25 @@ Manual smoke on a clean profile (`PI_DESKTOP_DATA_DIR=$(mktemp -d)`):
 
 ## 6. Native-runner release packages
 
-The repository exposes native-runner commands for every release target. Each
-packaging command first runs `build:host-release`, then bundles the agent
-runtime and Electron app. D126/D285/D603 tag workflows publish these outputs and
-their electron-updater manifests. Run a target command on that target OS:
+Use the packaging command for the runner OS. The shared release wrapper
+prepares the Rust host before starting Electron Builder.
 
 ```text
-macOS Apple Silicon: pnpm --filter @pi-desktop/desktop run dist:mac -- --arm64
-macOS Intel:         pnpm --filter @pi-desktop/desktop run dist:mac -- --x64
-Windows: pnpm --filter @pi-desktop/desktop dist:win
-Linux:   pnpm --filter @pi-desktop/desktop dist:linux -- --x64|--arm64
+macOS:   pnpm --filter @pi-desktop/desktop run dist:mac
+Windows: pnpm --filter @pi-desktop/desktop run dist:win
+Linux:   pnpm --filter @pi-desktop/desktop run dist:linux
 ```
 
-The Windows `dist:win` command runs `scripts/build-desktop-release.mjs`,
-which invokes electron-builder once for NSIS and once for ZIP so each package
-gets the correct updater distribution marker.
+macOS and Windows produce their Universal DMG and NSIS installer
+respectively. Previous portable Windows installs keep manual update
+discovery and can download the current NSIS installer. Existing application
+data stays in the same directory.
 
-The macOS packages include `bin/pi-desktop-host-core` built for their runner
-architecture; the Linux packages do the same on their native x64 and arm64
-runners; Windows includes `bin/pi-desktop-host-core.exe`. Signing, rollback,
-and installer upgrade
-qualification remain release hardening work; publication is active under
-D126/D285/D603.
-
-Native-runner output matrix:
-
-- macOS arm64: `PI-Desktop-<version>-arm64.dmg` and
-  `PI-Desktop-<version>-arm64-mac.zip`
-- macOS Intel x64: `PI-Desktop-<version>-x64.dmg` and
-  `PI-Desktop-<version>-x64-mac.zip`
-- Windows x64: NSIS installer `PI-Desktop-Setup-<version>.exe` and portable
-  ZIP `PI-Desktop-Portable-<version>.zip`
-- Linux x64 and arm64: AppImage, deb, and rpm
-- Linux system Electron assets: `PI-Desktop-<version>-linux-x64.asar` and
-  `PI-Desktop-<version>-linux-arm64.asar`
-
-The portable Windows ZIP target does not write `latest.yml`. The Windows
-release helper builds NSIS and ZIP separately and stamps the ZIP app metadata
-with `piDistribution = "zip"`; packaged ZIP runs use notify-and-link delivery.
-Legacy portable executables remain manual when `PORTABLE_EXECUTABLE_FILE` is
-present. NSIS keeps the in-app download and quit-and-install lane. Data stays
-in the existing application data directory. Users extract the ZIP and launch
-`PI-Desktop.exe` directly, so the package does not run a self-extracting
-wrapper or request administrator execution.
-
-RPM targets pass `_build_id_links none` to FPM. Bundled Electron binaries live
-under `/opt/PI-Desktop`; omitting global `/usr/lib/.build-id` links prevents
-collisions with other applications that bundle the same Electron binaries.
-
-The ASAR asset contains the Electron application archive, not a complete Linux
-distribution. To repackage it, place it as the application archive in the
-target Electron resources layout together with the native host and other
-resources from the target package, then launch it with:
-
-```bash
-electron PI-Desktop-<version>-linux-<arch>.asar
-```
+The manual Linux command targets the native runner architecture and builds
+AppImage, deb, and rpm. RPM targets pass `_build_id_links none` to FPM to
+avoid global build-ID collisions with other applications bundling Electron.
+`node scripts/export-linux-asar.mjs --arch <x64|arm64>` can copy the unpacked
+archive to a versioned file for local system-Electron repackaging.
 
 Shell smoke on each native runner:
 
@@ -612,12 +551,12 @@ Shell smoke on each native runner:
 
 ## 7. Known limitations
 
-- Linux deb/rpm and the Windows portable ZIP remain notify-and-link update
-  modes. Packaged macOS, Windows NSIS, and Linux AppImage use in-app
-  `electron-updater`.
-- Linux x64 and arm64 packages are built on Ubuntu 22.04 (native `ubuntu-22.04`
-  and `ubuntu-22.04-arm` runners), so host-core needs glibc 2.35 or newer
-  (Ubuntu 22.04, Debian 12, Fedora 36+). Each tag job runs
+- Windows NSIS and Developer ID-signed macOS builds support in-app
+  installation. The macOS manual lane and older Windows portable installs
+  check for updates and link to the current release.
+- The Linux SSH host archives are built on Ubuntu 22.04 (native
+  `ubuntu-22.04` and `ubuntu-22.04-arm` runners) and require glibc 2.35 or newer
+  (Ubuntu 22.04, Debian 12, Fedora 36+). Each SSH archive job runs
   `scripts/check-linux-host-glibc.mjs` and refuses a binary that needs a
   newer glibc.
 - Linux arm64 microphone capture works on Raspberry Pi boards only:
