@@ -6,6 +6,7 @@ export const esEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Windows usa un solo instalador para x86 y x64, y macOS usa un único DMG universal para Apple Silicon e Intel.",
+      "Elige un modelo de imagen de iAgent de tus grupos en Ajustes y abre el registro desde el formulario de inicio de sesión.",
     ],
   },
   {

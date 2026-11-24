@@ -21,12 +21,21 @@ export type IagentChatPrice = {
   }>;
 };
 
+export type IagentImageSelection = {
+  accountId: number;
+  groupId: number;
+  model: string;
+};
+
+export type IagentImageOption = { groupId: number; group: string; model: string };
+
 export type IagentStatus = {
   account?: { id: number; email: string };
   sync: "idle" | "ready" | "stale" | "expired";
   syncedAt?: number;
   groups: { id: string; name: string; models: number }[];
   image?: { group: string; model: string };
+  imageModels?: IagentImageOption[];
 };
 
 export type IagentLoginResult =

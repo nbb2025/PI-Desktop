@@ -6,6 +6,7 @@ export const koEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Windows는 x86과 x64에 공통 설치 프로그램 하나를 사용하며, macOS는 Apple Silicon과 Intel에 공통 유니버설 DMG를 사용합니다.",
+      "설정에서 계정 그룹의 iAgent 이미지 모델을 선택하고 로그인 양식에서 계정을 만들 수 있습니다.",
     ],
   },
   {

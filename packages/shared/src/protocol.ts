@@ -302,6 +302,7 @@ export const IPC = {
     iagentConfirm: "pi-desktop/iagent/confirm",
     iagentLogout: "pi-desktop/iagent/logout",
     iagentRefresh: "pi-desktop/iagent/refresh",
+    iagentSetImageModel: "pi-desktop/iagent/set-image-model",
     providersReorder: "pi-desktop/providers/reorder",
     providersCreate: "pi-desktop/providers/create",
     providersUpdate: "pi-desktop/providers/update",

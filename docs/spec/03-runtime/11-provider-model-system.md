@@ -677,6 +677,8 @@ Settings → Models offers optional email and password sign-in with an in-app
 verification step for accounts using two-factor authentication. Account
 credentials are kept in the host's encrypted secret store. The renderer sees
 account status and catalog metadata. The application can be opened as a guest.
+The guest sign-in form offers a registration link to the iAgent website in
+the system browser.
 
 iAgent chat providers are projected from the intersection of the signed-in
 account's active groups and the site's published model catalog. They have
@@ -717,11 +719,16 @@ creation outcome is retained per account, group and purpose. Synchronization
 and sign-out do not mutate the key inventory.
 
 The bundled imagegen skill uses `GenerateImages` in Agent mode. An explicitly
-configured image model wins. Otherwise iAgent supplies an authorized image
-model, preferring GPT Image and retaining the site's ordering among eligible
-choices. OpenAI Images, Gemini inline image generation and Grok Imagine
-generation and edits use their respective iAgent routes. The ordinary tool
-permission, cancellation and local result rendering rules apply.
+configured custom image model takes precedence. In Models settings a signed-in
+user can select an authorized iAgent image-generation model by group, or leave
+the picker on Automatic. Automatic prefers GPT Image and follows the site's
+ordering among eligible choices. The saved selection belongs to the account
+that picked it. Choosing a model does not allocate a workspace key. Generation
+revalidates access and reports unavailable choices for explicit selections
+that disappear, so the user can select another model or restore Automatic.
+OpenAI Images, Gemini inline images and Grok Imagine use their respective
+iAgent routes. Grok edits use the matching edit model in the selected group.
+Tool permission, cancellation and local result rendering apply.
 
 ## 14. Local / offline model support
 

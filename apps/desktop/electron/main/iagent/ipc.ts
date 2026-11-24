@@ -14,4 +14,5 @@ export function registerIagentIpc(registrar: IpcRegistrar, iagent: IagentIntegra
   handle(IPC.invoke.iagentConfirm, iagent.confirm);
   handle(IPC.invoke.iagentLogout, iagent.logout);
   handle(IPC.invoke.iagentRefresh, () => iagent.refresh(true));
+  handle(IPC.invoke.iagentSetImageModel, iagent.setImageModel);
 }

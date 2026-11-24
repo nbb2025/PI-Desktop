@@ -6,6 +6,7 @@ export const deEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Für Windows gibt es ein gemeinsames Installationsprogramm für x86 und x64 und für macOS ein Universal-DMG für Apple Silicon und Intel.",
+      "Wähle in den Einstellungen ein iAgent-Bildmodell aus deinen Gruppen und öffne die Registrierung über die Anmeldung.",
     ],
   },
   {

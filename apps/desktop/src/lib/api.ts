@@ -1,5 +1,5 @@
 import type { ReviewContextLines, ReviewContextResult, ReviewTurnsPage, ReviewChangesPage } from "@pi-desktop/shared";
-import type { IagentLoginResult, IagentStatus, IagentUpdate } from "@pi-desktop/shared";
+import type { IagentImageSelection, IagentLoginResult, IagentStatus, IagentUpdate } from "@pi-desktop/shared";
 type ClipboardDirectoryPaste = {
   items: Array<{ kind: "directory"; path: string; name: string } | { kind: "file"; name: string }>;
   token: string | null;
@@ -988,6 +988,8 @@ export const api = {
     invoke<IagentStatus>(IPC.invoke.iagentConfirm, { challengeId, code }),
   iagentLogout: () => invoke<IagentStatus>(IPC.invoke.iagentLogout),
   iagentRefresh: () => invoke<IagentStatus>(IPC.invoke.iagentRefresh),
+  iagentSetImageModel: (accountId: number, choice: Pick<IagentImageSelection, "groupId" | "model"> | null) =>
+    invoke<IagentImageSelection | null>(IPC.invoke.iagentSetImageModel, { accountId, choice }),
   onIagentChanged: (listener: (update: IagentUpdate) => void) => {
     if (!window.piDesktop?.on) return () => undefined;
     return window.piDesktop.on(IPC.event.iagentChanged, (payload) => listener(payload as IagentUpdate));

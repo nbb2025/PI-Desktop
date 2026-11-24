@@ -10,6 +10,7 @@ import {
   imageModelOfferedByProvider,
   parseImageGenerationBinding,
   type AppSettings,
+  type IagentImageSelection,
   type ProviderPublic,
 } from "@pi-desktop/shared";
 import type { HostProcess } from "../host-process";
@@ -32,7 +33,9 @@ export function createImageGenerationTool(options: {
   allowFakeIp?: () => boolean;
   resolveAuth?: VendorOAuth["resolveAuth"];
   resolveImageModel?: (provider: ProviderPublic, modelId: string) => Promise<ImageModel<ImageApi> | undefined>;
-  resolveDefault?: (edit: boolean) => Promise<{ endpoint: ImageEndpoint; assertCurrent: () => void } | undefined>;
+  resolveDefault?: (
+    edit: boolean, selection?: IagentImageSelection | null,
+  ) => Promise<{ endpoint: ImageEndpoint; assertCurrent: () => void } | undefined>;
 }): LocalToolHandler {
   return async ({ sessionId, args, signal }) => {
     const items = imageGenerationItems(args);
@@ -64,7 +67,10 @@ export function createImageGenerationTool(options: {
       };
     } else {
       signal.throwIfAborted();
-      const selected = await options.resolveDefault?.(items.some((item) => Boolean(item.images?.length)));
+      const selected = await options.resolveDefault?.(
+        items.some((item) => Boolean(item.images?.length)),
+        settings.iagentImageGeneration,
+      );
       if (!selected) {
         return failure("IMAGE_NOT_CONFIGURED", "Connect an iAgent account with image access or select an image model in Settings > Models.");
       }

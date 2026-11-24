@@ -6,6 +6,7 @@ export const zhCNEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Windows 的 x86 和 x64 版本统一使用一个安装包，macOS 的 Apple 芯片和 Intel 版本统一使用一个通用 DMG。",
+      "在设置中按分组选择 iAgent 生图模型，或从登录表单打开官网注册账号。",
     ],
   },
   {

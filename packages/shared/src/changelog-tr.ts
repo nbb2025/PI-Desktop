@@ -6,6 +6,7 @@ export const trEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Windows için x86 ve x64'ü destekleyen tek bir yükleyici, macOS için Apple Silicon ve Intel'i destekleyen tek bir evrensel DMG sunulur.",
+      "Ayarlar'da gruplarınızdan bir iAgent görsel modeli seçin ve giriş formundan hesap kaydını açın.",
     ],
   },
   {

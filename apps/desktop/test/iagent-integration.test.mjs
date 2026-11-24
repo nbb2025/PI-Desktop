@@ -42,12 +42,17 @@ function fixture() {
   const secrets = new Map();
   const changes = [];
   const calls = [];
+  let settings = {};
   let keyRequests = 0;
   const makeIntegration = (options = {}) => createIagentIntegration({
     now: () => now,
     language: () => "zh-CN",
     onChange: (update) => changes.push(update),
     call: async (method, params) => {
+      if (method === "settings.set") {
+        settings = { ...settings, ...params };
+        return settings;
+      }
       const ref = params.secretRef;
       if (method === "secrets.getForRuntime") return { value: secrets.get(ref) };
       if (method === "secrets.set") return secrets.set(ref, params.value);
@@ -115,7 +120,7 @@ function fixture() {
     failCatalog: (failed) => { catalogFailure = failed; }, failGroups: (failed) => { groupFailure = failed; },
     failPage: (failed) => { pageFailure = failed; }, failCreate: (failed) => { createFailure = failed; },
     failRefresh: () => { rejectRefresh = true; },
-    changes, calls, pages, existing, keyRequests: () => keyRequests,
+    changes, calls, pages, existing, keyRequests: () => keyRequests, settings: () => settings,
   };
 }
 
@@ -261,6 +266,51 @@ test("refresh handles revoked, new and republished groups without cross-account 
   assert.equal(integration.providers()[0].id, "iagent:52:9");
   await assert.rejects(integration.resolveChat("iagent:41:9", "model-10"), /no longer available/);
   assert.ok(mock.changes.at(-1).catalogChanged);
+});
+
+test("the image picker persists a catalog choice and validates it again at generation", async () => {
+  const mock = fixture();
+  const integration = mock.makeIntegration();
+  mock.setCatalog({
+    models: [
+      model(4, "gpt-image-2"), model(4, "gpt-image-1"),
+      model(3, "grok-imagine-image"), model(3, "grok-imagine-edit"),
+      model(5, "wan3.0-video"), model(8, "gpt-image-inactive"),
+    ],
+    group_order: [4, 3],
+  });
+  const login = await integration.login({ email: "desktop@example.test", password: "fake-password" });
+  assert.deepEqual(login.status.imageModels.map(({ groupId, model }) => [groupId, model]), [
+    [4, "gpt-image-2"], [4, "gpt-image-1"], [3, "grok-imagine-image"],
+  ]);
+  await assert.rejects(
+    integration.setImageModel({ accountId: 52, choice: { groupId: 4, model: "gpt-image-1" } }),
+    /image model is unavailable/,
+  );
+  await assert.rejects(
+    integration.setImageModel({ accountId: 41, choice: { groupId: 3, model: "grok-imagine-edit" } }),
+    /image model is unavailable/,
+  );
+  const gpt = await integration.setImageModel({ accountId: 41, choice: { groupId: 4, model: "gpt-image-1" } });
+  assert.deepEqual(mock.settings().iagentImageGeneration, gpt);
+  assert.equal(mock.keyRequests(), 0, "selecting a model does not allocate a workspace key");
+  assert.equal((await integration.imageEndpoint(false, gpt)).endpoint.modelId, "gpt-image-1");
+  await integration.setImageModel({ accountId: 41, choice: null });
+  assert.equal(mock.settings().iagentImageGeneration, null);
+  assert.equal((await integration.imageEndpoint(false, null)).endpoint.modelId, "gpt-image-2");
+  assert.equal(mock.keyRequests(), 1, "changing models in one group reuses the same media key");
+
+  const grok = await integration.setImageModel({ accountId: 41, choice: { groupId: 3, model: "grok-imagine-image" } });
+  assert.equal((await integration.imageEndpoint(false, grok)).endpoint.modelId, "grok-imagine-image");
+  assert.equal((await integration.imageEndpoint(true, grok)).endpoint.modelId, "grok-imagine-edit");
+  mock.setGroups([group(4, "GPT Image", "openai")]);
+  await integration.refresh(true);
+  await assert.rejects(integration.imageEndpoint(false, grok), /image model is unavailable/);
+
+  await integration.logout();
+  mock.setUser(52);
+  await integration.login({ email: "other@example.test", password: "fake-password" });
+  assert.equal((await integration.imageEndpoint(false, grok)).endpoint.modelId, "gpt-image-2");
 });
 
 test("workspace keys reuse all pages, stay account-scoped, and coalesce first use", async () => {
