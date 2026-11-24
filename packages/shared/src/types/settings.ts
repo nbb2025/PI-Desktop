@@ -60,6 +60,8 @@ export type StartupAnimationSettings = {
 
 export type AppSettings = {
   imageGeneration?: import("../image-generation.js").ImageGenerationBinding | null;
+  /** Account-scoped choice for the built-in iAgent image route. */
+  iagentImageGeneration?: import("./iagent.js").IagentImageSelection | null;
   /** All models marked for image generation; absent falls back to imageGeneration. */
   imageGenerationModels?: import("../image-generation.js").ImageGenerationBinding[] | null;
   defaultProviderId?: string;

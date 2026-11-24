@@ -6,6 +6,7 @@ export const zhTWEntries: ChangelogEntry[] = [
     date: "2026-11-24",
     highlights: [
       "Windows 的 x86 和 x64 版本統一使用一個安裝程式，macOS 的 Apple 晶片和 Intel 版本統一使用一個通用 DMG。",
+      "在設定中按分組選擇 iAgent 生圖模型，或從登入表單開啟官網註冊帳號。",
     ],
   },
   {

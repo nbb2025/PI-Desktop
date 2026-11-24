@@ -51,7 +51,8 @@ export function imageChatModel() {
           assert.ok(raw.includes(Buffer.from("image/png")));
           assert.ok(raw.includes(Buffer.from("89504e470d0a1a0a", "hex")), "edit uploads source PNG");
         }
-        imageRequests.push({ edited, bytes: raw.length });
+        const model = edited ? undefined : JSON.parse(raw.toString()).model;
+        imageRequests.push({ edited, bytes: raw.length, model });
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify({ data: [{ b64_json: png(edited, imageRequests.length % 2).toString("base64") }] }));
         return;

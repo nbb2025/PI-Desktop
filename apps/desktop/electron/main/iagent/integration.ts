@@ -1,5 +1,5 @@
 import {
-  ErrorCodes, IAGENT_ORIGIN, type IagentLoginResult, type IagentStatus, type IagentUpdate,
+  ErrorCodes, IAGENT_ORIGIN, type IagentImageSelection, type IagentLoginResult, type IagentStatus, type IagentUpdate,
 } from "@pi-desktop/shared";
 import { modelInfoFromModelsDev, type ModelsDevCatalog } from "../models-dev-catalog.ts";
 import { IagentAccount, type IagentHostCall, type IagentSession } from "./account.ts";
@@ -36,6 +36,33 @@ function defaultImage(images: readonly IagentImageModel[], edit = false) {
     images.find((image) => image.protocol !== "grok" || /grok[-_. ]?imagine[-_. ]?edit/i.test(image.model) === edit);
 }
 
+function canGenerate(image: IagentImageModel): boolean {
+  return image.protocol !== "grok" || !/grok[-_. ]?imagine[-_. ]?edit/i.test(image.model);
+}
+
+function findImage(images: readonly IagentImageModel[], choice: unknown): IagentImageModel | undefined {
+  if (!choice || typeof choice !== "object" || !("groupId" in choice) || !("model" in choice)) return undefined;
+  return images.find((image) => canGenerate(image) && image.group.id === choice.groupId && image.model === choice.model);
+}
+
+function imageUnavailable() {
+  return Object.assign(new Error("This iAgent image model is unavailable. Choose another model in Settings > Models."), {
+    errorCode: ErrorCodes.MODEL_NOT_CONFIGURED,
+  });
+}
+
+function selectedImage(images: readonly IagentImageModel[], choice: IagentImageSelection, edit: boolean) {
+  const image = findImage(images, choice);
+  if (!image) throw imageUnavailable();
+  if (!edit || image.protocol !== "grok") return image;
+  const editModel = image.model.replace(/(grok[-_. ]?imagine[-_. ]?)image/i, "$1edit");
+  const editEndpoint = images.find((entry) =>
+    entry.protocol === "grok" && entry.group.id === image.group.id && entry.model === editModel,
+  );
+  if (!editEndpoint) throw imageUnavailable();
+  return editEndpoint;
+}
+
 export function createIagentIntegration(options: {
   call: IagentHostCall;
   language: () => string;
@@ -57,13 +84,17 @@ export function createIagentIntegration(options: {
 
   function publicStatus(session: IagentSession | undefined): IagentStatus {
     const current = snapshot?.session === session && !session?.expired ? snapshot : undefined;
-    const image = defaultImage(current?.projection.images ?? []);
+    const images = current?.projection.images ?? [];
+    const image = defaultImage(images);
     return {
       account: session?.user,
       sync: session?.expired ? "expired" : current?.stale ? "stale" : current?.syncedAt !== undefined ? "ready" : "idle",
       syncedAt: current?.syncedAt,
       groups: current?.projection.providers.map((provider) => ({ id: provider.id, name: provider.name, models: provider.models.length })) ?? [],
       image: image && { group: image.group.name, model: image.model },
+      imageModels: images.filter(canGenerate).map(({ group, model }) => ({
+        groupId: group.id, group: group.name, model,
+      })),
     };
   }
 
@@ -224,10 +255,27 @@ export function createIagentIntegration(options: {
     modelChoices(providerId: string) {
       return !snapshot?.session.expired ? snapshot?.projection.models.get(providerId) ?? [] : [];
     },
-    async imageEndpoint(edit: boolean) {
+    async setImageModel(input: { accountId?: unknown; choice?: unknown } | undefined) {
+      const session = await account.session();
+      if (!session || session.expired || input?.accountId !== session.user.id) throw imageUnavailable();
+      const images = snapshot?.session === session ? snapshot.projection.images : [];
+      const image = input.choice === null ? null : findImage(images, input.choice);
+      if (image === undefined) throw imageUnavailable();
+      const selection: IagentImageSelection | null = image && {
+        accountId: session.user.id, groupId: image.group.id, model: image.model,
+      };
+      account.assertSession(session);
+      await options.call("settings.set", { iagentImageGeneration: selection });
+      return selection;
+    },
+    async imageEndpoint(edit: boolean, choice?: IagentImageSelection | null) {
       const current = await forDispatch();
-      const selected = defaultImage(current?.projection.images ?? [], edit);
-      if (!current || !selected) return undefined;
+      if (!current) return undefined;
+      const images = current.projection.images;
+      const selected = choice?.accountId === current.session.user.id
+        ? selectedImage(images, choice, edit)
+        : defaultImage(images, edit);
+      if (!selected) return undefined;
       const { group, model, protocol } = selected;
       const apiKey = await key(current.session, group, "media");
       const assertCurrent = () => {

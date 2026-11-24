@@ -36,6 +36,7 @@ const videoGroup = { id: 30, name: "iAgent Video Fixture", platform: "video-lt",
 const newGroup = { id: 40, name: "iAgent New Fixture", platform: "composite", status: "active" };
 const reasoningGroup = { id: 50, name: "ChatGPT-8倍速（专用分组）", platform: "openai", status: "active", rate_multiplier: 0.9 };
 const chatModel = "gpt-6.2-reasoning-fixture";
+const selectedImageModel = "gpt-image-1-fixture";
 const basePrice = { found: true, input_price: 0.00001, output_price: 0.00005 };
 let groups = [chatGroup, reasoningGroup, imageGroup, videoGroup];
 let catalog = [
@@ -43,10 +44,12 @@ let catalog = [
   { id: chatModel, group_id: 50, default_pricing: basePrice },
   { id: "codex-auto-review", group_id: 10 },
   { id: "gpt-image-2", group_id: 20 },
+  { id: selectedImageModel, group_id: 20 },
   { id: "sd-2-fast-720", group_id: 30 },
 ];
 const posts = [];
 const faults = [];
+const externalUrls = [];
 const wires = [];
 const requests = [];
 const reasoningRequests = [];
@@ -62,6 +65,13 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://fixture");
     const { pathname } = url;
+    if (pathname === "/os/open-external") {
+      assert.equal(req.method, "POST");
+      let externalUrl = "";
+      for await (const chunk of req) externalUrl += chunk;
+      externalUrls.push(externalUrl);
+      return reply(res, {});
+    }
     requests.push(`${req.method} ${pathname}`);
     if (pathname === "/api.json") {
       assert.equal(req.headers.authorization, undefined);
@@ -172,8 +182,17 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 
 const fetchHook = join(root, "fetch-fixture.mjs");
-writeFileSync(fetchHook, `const target = "http://127.0.0.1:${server.address().port}";
+writeFileSync(fetchHook, `import { createRequire } from "node:module";
+const target = "http://127.0.0.1:${server.address().port}";
 let inner = globalThis.fetch;
+if (process.type === "browser") {
+  const { shell } = createRequire(import.meta.url)("electron");
+  shell.openExternal = async (url) => {
+    const response = await inner(target + "/os/open-external", { method: "POST", body: url });
+    if (!response.ok) throw new Error("External URL fixture failed");
+  };
+  console.log("External URL fixture installed");
+}
 const redirecting = (input, init) => {
   const url = new URL(input instanceof Request ? input.url : String(input));
   if (url.hostname !== "ai.iagent.dev" && url.hostname !== "models.dev") return inner(input, init);
@@ -255,12 +274,35 @@ try {
   assert.equal((await invoke("iagentStatus")).account, undefined);
   await evaluate('window.__PI_DESKTOP__.skipStartupOverlays(); window.__PI_DESKTOP__.setSettingsTab("agent");');
   await waitFor(() => evaluate(`!!document.querySelector('input[autocomplete="username"]')`), 10_000, "iAgent sign-in form");
+  assert.match(output, /External URL fixture installed/);
+  const registrationButton = `[...document.querySelectorAll("button")].find(
+    (button) => button.type === "button" && button.textContent.trim() === "注册账号"
+  )`;
+  assert.ok(await evaluate(`Boolean(${registrationButton})`), "the iAgent guest login offers registration");
+  await evaluate(`${registrationButton}.click()`);
+  await waitFor(() => externalUrls.length > 0, 5_000, "registration opens the iAgent homepage");
+  assert.deepEqual(externalUrls, ["https://ai.iagent.dev/"]);
   const login = await invoke("iagentLogin", { email: "desktop@example.test", password: "fixture-password" });
   assert.equal(login.status.sync, "ready");
   const providerList = await invoke("providersList");
   assert.deepEqual(providerList.providers.map((provider) => provider.name), [chatGroup.name, reasoningGroup.name]);
   assert.deepEqual(providerList.providers[0].models.map((model) => model.id), [chatModel]);
   assert.deepEqual(posts, []);
+  const imageTrigger = 'button[aria-label="iAgent 生图模型"]';
+  await waitFor(() => evaluate(`document.querySelector(${JSON.stringify(imageTrigger)})?.textContent.includes("自动选择")`),
+    10_000, "the signed-in account defaults to automatic image selection");
+  await evaluate(`document.querySelector(${JSON.stringify(imageTrigger)}).click()`);
+  await waitFor(() => evaluate(`[...document.querySelectorAll('[role="option"]')].some(
+    (item) => item.textContent.includes(${JSON.stringify(selectedImageModel)})
+  )`), 5_000, "the iAgent image model menu displays authorized models");
+  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(
+    (item) => item.textContent.includes(${JSON.stringify(selectedImageModel)})
+  ).click()`);
+  await waitFor(() => evaluate(`document.querySelector(${JSON.stringify(imageTrigger)})?.textContent.includes(${JSON.stringify(selectedImageModel)})`),
+    5_000, "the selected image model appears in settings");
+  assert.deepEqual((await invoke("settingsGet")).iagentImageGeneration, {
+    accountId: 71, groupId: 20, model: selectedImageModel,
+  });
   await evaluate('window.__PI_DESKTOP__.setPage("chat")');
   await waitFor(() => evaluate(`!!document.querySelector('.composer-input[contenteditable="true"]')`), 15_000, "agent composer");
   await waitFor(() => evaluate(`(async () => {
@@ -353,6 +395,7 @@ try {
   await sendPrompt("Generate two raster images.");
   await waitFor(() => evaluate('document.querySelector(".generated-image-preview img")?.naturalWidth === 480'), 50_000, "Agent-created image preview");
   assert.equal(chat.imageRequests.length, 2);
+  assert.deepEqual(chat.imageRequests.map(({ model }) => model), [selectedImageModel, selectedImageModel]);
   assert.equal(imageTasks.size, 2, "one accepted image task per requested output");
   assert.equal(posts.length, 1);
   assert.ok(wires.includes("/v1/chat/completions"));
@@ -364,7 +407,7 @@ try {
   await invoke("iagentLogout");
   assert.deepEqual((await invoke("providersList")).providers, []);
   assert.deepEqual(faults, []);
-  console.log("PASS: iAgent prices, responsive picker, live model metadata, reasoning on the wire, key reuse, image preview and disconnect");
+  console.log("PASS: iAgent registration link, image model selection and preview, prices, responsive picker, reasoning, key reuse and disconnect");
 } catch (error) {
   console.error("Fixture requests", requests, faults, chat.failures);
   if (ws?.readyState === WebSocket.OPEN) console.error(await screen().catch(() => ""));
