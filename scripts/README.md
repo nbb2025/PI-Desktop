@@ -121,9 +121,9 @@ version explicitly supplied for a prerelease preview.
 repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the
 build jobs wait for it. The Windows and macOS runners validate the tag against
 `apps/desktop/package.json` and produce one universal installer each. The
-two Linux jobs build the SSH host archives on Ubuntu 22.04 and check the
-glibc 2.35 floor. A tag publishes the installers, updater files, and SSH host
-archives. A manual dispatch retains Actions artifacts. The signed macOS lane
+publishing job accepts those two installers, computes the SHA-512 checksums,
+and places them in the Release description. A tag publishes both installers.
+A manual dispatch retains Actions artifacts. The signed macOS lane
 requires Developer ID and notarization credentials. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).
 

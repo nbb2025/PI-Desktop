@@ -581,9 +581,9 @@ Agent / Plan / Goal
 | macOS | Apple Silicon and Intel | Universal DMG |
 | Windows | x86 and x64 | Universal NSIS installer |
 
-The Windows installer selects the correct architecture and supports in-app updates. The macOS app checks for updates and links to the DMG for manual installation. Developer ID signing and Apple notarization enable in-app installation.
+The Windows installer selects the correct architecture and supports in-app updates. The macOS app checks for updates and links to the DMG for installation. Upgrade from v0.24.0 by downloading the installer once.
 
-Linux desktop packages can be built locally using the [release runbook](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages). The `pi-host` assets on GitHub Releases support SSH remote workspaces.
+Linux desktop packages can be built locally using the [release runbook](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages). SSH workspace bootstrap requires a separately supplied matching host bundle.
 
 ---
 

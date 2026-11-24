@@ -63,9 +63,10 @@ Verification is layered and recorded separately:
 4. Full Linux SSH/Desktop bootstrap, checksum/version rejection, restart and
    password-only SSH remain E2E-231 prerequisites and require a real target.
 
-Published SSH bootstrap requires the matching release to contain the new Host
-bundle; a successful local bundle does not publish those release assets.
-See `apps/pi-host/README.md` for candidate build and local acceptance commands.
+Published SSH bootstrap requires the matching release to contain the Host
+bundle. iAgent desktop tags contain installers only, so they require an
+independently provisioned remote host. See `apps/pi-host/README.md` for
+build and local acceptance commands.
 
 ## 2. Milestones
 

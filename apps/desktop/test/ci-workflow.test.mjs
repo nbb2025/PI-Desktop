@@ -71,7 +71,7 @@ test("release runners validate tags without a separate job barrier", () => {
 });
 
 test("release packaging delegates each installer to its platform command", () => {
-  const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  pi-host-bundle:)/m)?.[0];
+  const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
   assert.ok(buildJob, "release build job is missing");
   assert.match(buildJob, /pnpm --filter @pi-desktop\/desktop run dist:win/);
   assert.match(buildJob, /pnpm --filter @pi-desktop\/desktop run dist:mac/);
@@ -135,19 +135,14 @@ test("manual Linux package validation covers the RPM desktop identity", () => {
 });
 
 test("tag releases only publish desktop installers for Windows and macOS", () => {
-  const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  pi-host-bundle:)/m)?.[0];
+  const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
   assert.ok(buildJob, "release build job is missing");
   assert.deepEqual(
     [...buildJob.matchAll(/- name: (.* Universal)\n/g)].map(([, name]) => name),
     ["macOS Universal", "Windows Universal"],
   );
   assert.doesNotMatch(buildJob, /dist:linux|AppImage|\.asar|\.rpm|\.deb|latest-linux|Portable/);
-  // Windows and macOS use both pi-host architectures for SSH workspaces.
-  assert.match(
-    releaseWorkflowSource,
-    /pi-host-bundle:[\s\S]*?- arch: x64[\s\S]*?os: ubuntu-22\.04[\s\S]*?- arch: arm64[\s\S]*?os: ubuntu-22\.04-arm/,
-  );
-  assert.match(releaseWorkflowSource, /pi-host-\*-linux-.*\.tar\.gz\.sha256/);
+  assert.doesNotMatch(releaseWorkflowSource, /pi-host-bundle:|pi-host-\*-linux|latest-ia32\.yml|manual-mac\.yml/);
 });
 
 test("the Linux package config lets the workflow choose the architecture", () => {
@@ -190,7 +185,7 @@ test("release jobs verify both architectures inside their universal installers",
   assert.doesNotMatch(releaseWorkflowSource, /-c\.(?:dmg|zip)\.artifactName/);
 });
 
-test("macOS automatic updates require the signed release lane", () => {
+test("macOS Developer ID signing retains the notarization and watchdog requirements", () => {
   assert.match(
     releaseWorkflowSource,
     /workflow_dispatch:\s+inputs:\s+sign_macos:[\s\S]*?default:\s*true[\s\S]*?type:\s*boolean/,
@@ -213,7 +208,6 @@ test("macOS automatic updates require the signed release lane", () => {
   assert.doesNotMatch(manualBlock, /forceCodeSigning|notarize/);
 
   assert.match(releaseWorkflowSource, /Incomplete macOS signing configuration/);
-  assert.match(releaseWorkflowSource, /node scripts\/write-macos-update-feed\.mjs/);
 
   const signedBlock = releaseWorkflowSource.match(
     /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
@@ -229,7 +223,7 @@ test("macOS automatic updates require the signed release lane", () => {
   ]) {
     assert.match(signedBlock, new RegExp(`${secret}:\\s*\\$\\{\\{\\s*secrets\\.${secret}\\s*\\}\\}`));
   }
-  assert.match(signedBlock, /-c\.extraMetadata\.piMacUpdates=true/);
+  assert.doesNotMatch(signedBlock, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.doesNotMatch(signedBlock, /-c\.mac\.identity=/);
   assert.doesNotMatch(signedBlock, /CSC_NAME: "Developer ID Application:/);
   assert.match(signedBlock, /-c\.mac\.notarize=true/);
@@ -289,8 +283,8 @@ test("macOS automatic updates require the signed release lane", () => {
 });
 
 test("the signed local macOS lane uses the universal packaging command", () => {
-  assert.match(releaseMacScriptSource, /run dist:mac --signed-macos/);
-  assert.match(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
+  assert.match(releaseMacScriptSource, /run dist:mac /);
+  assert.doesNotMatch(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.match(
     releaseMacScriptSource,
     /MAC_SIGNING_IDENTITY="\$\{MAC_SIGNING_IDENTITY#Developer ID Application: \}"/,

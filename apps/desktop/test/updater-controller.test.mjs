@@ -20,6 +20,10 @@ class FakeUpdater extends EventEmitter {
   downloadStarts = [];
   cancellations = [];
 
+  setFeedURL(feed) {
+    this.feed = feed;
+  }
+
   async checkForUpdates() {
     this.emit("checking-for-update");
     const info = {
@@ -66,7 +70,7 @@ function createController({ updater, settings = {}, persist = async () => {}, ..
   return { controller, sent };
 }
 
-test("unsigned macOS checks the manual release feed without installing, even with automatic saved", async () => {
+test("manual macOS discovers the release without installing, even with automatic saved", async () => {
   const updater = new FakeUpdater();
   const { controller } = createController({
     updater, macUpdatesCapable: false, settings: { updatePreference: "automatic" },
@@ -74,20 +78,21 @@ test("unsigned macOS checks the manual release feed without installing, even wit
   await controller.check();
   assert.equal(controller.getState().mode, "manual");
   assert.equal(controller.getState().releasesUrl, "https://github.com/nbb2025/PI-Desktop/releases/latest");
-  assert.equal(updater.channel, "manual");
+  assert.equal(updater.feed.provider, "custom");
   assert.equal(updater.allowDowngrade, false);
   assert.deepEqual(updater.downloadStarts, []);
   controller.dispose();
 });
 
-test("32-bit Windows uses its own installer feed and can download in-app", async () => {
+test("Windows uses the installer release and can download in-app", async () => {
   const updater = new FakeUpdater();
   const { controller } = createController({
-    updater, platform: "win32", arch: "ia32", distribution: "installed",
+    updater, platform: "win32", distribution: "installed",
   });
   await controller.check();
   assert.equal(controller.getState().mode, "in-app");
-  assert.equal(updater.channel, "latest-ia32");
+  assert.equal(updater.feed.provider, "custom");
+  assert.equal(updater.disableDifferentialDownload, true);
   assert.equal(updater.allowDowngrade, false);
   assert.deepEqual(updater.downloadStarts, ["0.16.1"]);
   controller.dispose();

@@ -26,7 +26,7 @@
  * previewed. Use --skip-docs-check only for a deliberate non-release bump.
  *
  * Pushing the tag triggers .github/workflows/release.yml, which builds the
- * macOS and Windows installers and uploads them and the SSH host archives to GitHub:
+ * one macOS and one Windows installer and publishes them to GitHub:
  *
  *   git push origin <branch> v<version>
  */

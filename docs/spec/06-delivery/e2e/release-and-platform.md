@@ -187,18 +187,14 @@
 - **Acceptance**: Quality (packaging compatibility)
 - **Status**: The archive export is covered by `release-asar.test.mjs`.
 
-## E2E-192a: Tag releases include the Linux SSH host archives
+## E2E-192a: The iAgent tag publishes exactly two installers
 
-- **Preconditions**: A release tag matches the desktop and `pi-host` versions.
-- **Steps**: Inspect both published Linux archives and their SHA-256 files.
-  Start SSH workspace bootstrap from a Windows or macOS installation for an
-  x64 and an arm64 remote host.
-- **Expected**: Each host receives the matching `pi-host` archive and passes
-  checksum validation. The desktop release page lists a Windows installer
-  and a macOS installer.
-- **Specs linked**: `06-delivery/06-release-runbook.md`, `06-delivery/07-remote-control-rollout.md`
-- **Acceptance**: Quality (SSH release compatibility)
-- **Status**: The workflow and SSH release resolution have contract coverage.
+- **Steps**: Build a matching tag and inspect the uploaded release assets.
+- **Expected**: The assets contain the Windows installer and Universal DMG.
+  Publish refuses unexpected files. The resulting description contains the
+  SHA-512 checksum of both installers.
+- **Specs linked**: `06-delivery/06-release-runbook.md`
+- **Status**: The writer and desktop provider share an installer release fixture.
 
 ## E2E-200: Linux RPM preserves the Wayland desktop identity
 
@@ -231,8 +227,8 @@
   or a matching tag is pushed with all Apple signing inputs absent.
 - **Steps**: Verify the Universal app and Rust host with
   `lipo -verify_arch` for arm64 and x86_64 and verify the ad-hoc signature. Compare the
-  DMG's SHA-512 and size with the entries in `manual-mac.yml`.
-- **Expected**: The lane produces one Universal DMG and its manual feed.
+  DMG's SHA-512 with the entry in the release description.
+- **Expected**: The lane produces one Universal DMG.
   Existing manual builds can discover the release and open the DMG download
   page. A tag publishes the assets, and manual dispatch retains them in Actions.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
@@ -243,7 +239,6 @@
 ## E2E-196b: macOS packages omit first-launch helper assets
 
 - **Preconditions**: A macOS packaging run has produced a Universal DMG.
-  A Developer ID run also produces the universal updater ZIP.
 - **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
   the only items in its window. 2) In the signed lane, inspect the ZIP root without extracting the
   app and confirm neither `PI-Desktop-macOS-opening-help.txt` nor
@@ -729,8 +724,8 @@ for the active release and updater check.
      native prebuild targets.
   3. Check the Universal macOS app and `Resources/bin/pi-desktop-host-core`
      with `lipo -verify_arch` for arm64 and x86_64. Verify the Universal DMG and
-     its manual feed. In the signed lane verify the updater ZIP and
-     `latest-mac.yml`, and compare the manual feed with the stapled DMG.
+     its SHA-512 in the release description. In the signed lane verify the
+     notarization ticket on the final DMG.
   4. Inspect the renderer output for its size controls: emitted JS is minified,
      no `.woff` or `.ttf` files are present, only the KaTeX `woff2` faces remain
      (no application font face is emitted any more), and
@@ -749,7 +744,7 @@ for the active release and updater check.
 - **Expected**: Each macOS package contains exactly one bundled agent sidecar,
   one Rust host matching its declared architecture, and only configured
   Chromium locale packs. The release output contains both native macOS
-  architectures, DMG/ZIP artifacts, and one merged updater feed. Each macOS
+  architectures, a single DMG, and installer metadata in the release description. Each macOS
   DMG and ZIP carries its standard `-arm64` or `-x64` architecture marker, and
   no generic macOS DMG, ZIP, or blockmap remains in the release output. The
   per-architecture updater metadata points to those names without collisions.
@@ -1001,7 +996,7 @@ for the active release and updater check.
 - **Preconditions**: An archived Windows x64 portable ZIP and the current
   Universal NSIS installer are available; a clean user profile is available; the
   account is a standard user without administrator elevation.
-- **Steps**: 1) Inspect the release directory and `latest.yml`. 2) Extract the
+- **Steps**: 1) Inspect the matching historical release directory and `latest.yml`. 2) Extract the
   portable ZIP to a user-writable directory without running the NSIS installer.
   3) Launch the extracted `PI-Desktop.exe`. 4) Confirm there is no
   administrator prompt and that the running app has the PI-Desktop icon and
@@ -1010,7 +1005,7 @@ for the active release and updater check.
   restore Manual. 6) Invoke Check for Updates. 7) Confirm Settings → Info offers
   the releases page rather than Restart to update. 8) Quit and relaunch the
   extracted executable.
-- **Expected**: The current `latest.yml` points at the Universal NSIS installer. The extracted ZIP app starts without a
+- **Expected**: The historical `latest.yml` identifies its NSIS installer. The extracted ZIP app starts without a
   setup wizard or administrator prompt, keeps the normal PI-Desktop taskbar
   identity/icon, uses the existing application data directory, and reports
   update preference `manual` by default and effective update mode `manual`.
@@ -1308,10 +1303,9 @@ Use synthetic Darwin x64/arm64 uname responses through production SSH bootstrap,
 - Build a matching tag on the fork. Verify exactly one Windows Universal NSIS
   installer and one macOS Universal DMG. The Windows installer selects an
   x86 or x64 payload whose Electron and Rust host match the installed OS.
-- An existing Windows installation on either architecture discovers the same
-  Universal update using its current feed. A macOS manual-install build
-  discovers the DMG via the manual feed and links to the GitHub Release. A
-  Developer ID-signed build can install the Universal ZIP update after restart.
-- Controller coverage runs with the updater and packaging boundaries
-  controlled. A signed installed-app upgrade needs certificates for both
-  releases and a native macOS test machine.
+- The universal Windows release on both architectures discovers the same
+  checksum-verified installer through the GitHub Releases API and can download
+  and schedule it for installation. macOS discovers the DMG and links to the
+  Release page for installation. v0.24.0 requires a manual upgrade.
+- The controller and release-provider tests cover the publish-to-discovery
+  path with fixture installers and a controlled updater.

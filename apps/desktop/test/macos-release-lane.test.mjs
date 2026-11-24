@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { chmod, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -27,7 +26,6 @@ const LANE_SCRIPTS = [
   "macos-codesign-shim.sh",
   "macos-stapler-retry-shim.sh",
   "macos-bundle-inventory.mjs",
-  "write-macos-update-feed.mjs",
 ];
 const SIGNING_IDENTITY = "Developer ID Application: Fixture Publisher (ABCDE12345)";
 const SUBMISSION_ID = "11111111-2222-3333-4444-555555555555";
@@ -96,7 +94,6 @@ test(
     const log = join(root, "calls.log");
     await mkdir(join(repoRoot, "scripts"), { recursive: true });
     await mkdir(join(repoRoot, "apps/desktop"), { recursive: true });
-    await writeFile(join(repoRoot, "apps/desktop/package.json"), '{"version":"0.0.0"}');
     for (const name of LANE_SCRIPTS) {
       await cp(new URL(name, scripts), join(repoRoot, "scripts", name));
     }
@@ -121,8 +118,8 @@ test(
 
     const builderCall = calls.find((line) => line.includes("run dist:mac"));
     assert.ok(builderCall, "the lane invokes the shared packaging command");
-    assert.match(builderCall, /run dist:mac --signed-macos/);
-    assert.match(builderCall, /-c\.extraMetadata\.piMacUpdates=true/);
+    assert.match(builderCall, /run dist:mac /);
+    assert.doesNotMatch(builderCall, /-c\.extraMetadata\.piMacUpdates=true/);
     assert.match(
       await readFile(join(repoRoot, "scripts", "release-macos.sh"), "utf8"),
       /PI_STAPLER_MAX_ATTEMPTS="\$\{PI_STAPLER_MAX_ATTEMPTS:-6\}"/,
@@ -152,16 +149,8 @@ test(
       "one DMG submission",
     );
     const releaseDir = join(repoRoot, "apps/desktop/release");
-    const manualFeed = JSON.parse(await readFile(join(releaseDir, "manual-mac.yml"), "utf8"));
-    assert.equal(manualFeed.version, "0.0.0");
     const dmg = "PI-Desktop-0.0.0-universal.dmg";
-    const stapled = "disk image with a stapled ticket";
-    assert.equal(await readFile(join(releaseDir, dmg), "utf8"), stapled);
-    assert.deepEqual(manualFeed.files, [{
-      url: dmg,
-      size: Buffer.byteLength(stapled),
-      sha512: createHash("sha512").update(stapled).digest("base64"),
-    }]);
+    assert.equal(await readFile(join(releaseDir, dmg), "utf8"), "disk image with a stapled ticket");
 
     // The packaging phase stays wrapped, and the watchdog reports its summary.
     assert.match(result.stdout, /\[sign\] summary label=release-macos-/);

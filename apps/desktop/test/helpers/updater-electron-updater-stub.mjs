@@ -5,6 +5,10 @@ export class StubAutoUpdater extends EventEmitter {
   autoInstallOnAppQuit = false;
   allowPrerelease = false;
   logger = null;
+
+  setFeedURL(feed) {
+    this.feed = feed;
+  }
 }
 
 export class NsisUpdater extends StubAutoUpdater {
@@ -13,4 +17,14 @@ export class NsisUpdater extends StubAutoUpdater {
 
 export const autoUpdater = new StubAutoUpdater();
 
-export default { NsisUpdater, autoUpdater };
+export class Provider {
+  constructor(options) {
+    this.executor = options.executor;
+  }
+
+  httpRequest(url, headers) {
+    return this.executor.request(url, headers);
+  }
+}
+
+export default { NsisUpdater, autoUpdater, Provider };

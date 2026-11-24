@@ -7,9 +7,7 @@
 #   git push origin <branch> v0.2.0        # push → this workflow builds & publishes
 #
 # Publish one Windows NSIS installer for x86/x64 and one macOS Universal DMG.
-# The Windows feeds cover existing installations on both architectures. macOS
-# publishes the manual feed and includes the updater ZIP only when signed and
-# notarized. Linux pi-host bundles and checksums support SSH remote workspaces.
+# Installer checksums live in the release description.
 
 name: Release
 
@@ -235,8 +233,7 @@ jobs:
           # PI_SIGNING_TIMEOUT_SECONDS instead of waiting for the job timeout.
           node scripts/macos-signing-watchdog.mjs \
             --label "dist:mac-universal" \
-            -- pnpm --filter @pi-desktop/desktop run dist:mac --signed-macos \
-              -c.extraMetadata.piMacUpdates=true \
+            -- pnpm --filter @pi-desktop/desktop run dist:mac \
               -c.mac.forceCodeSigning=true \
               -c.mac.notarize=true
 
@@ -283,9 +280,7 @@ jobs:
           installers=(apps/desktop/release/*.exe)
           test "${#installers[@]}" -eq 1
           test "${installers[0]}" = "apps/desktop/release/$name"
-          test -f "${installers[0]}.blockmap"
-          cmp apps/desktop/release/latest.yml apps/desktop/release/latest-ia32.yml
-          grep -Fq "path: $name" apps/desktop/release/latest.yml
+          test ! -e "${installers[0]}.blockmap"
           node --input-type=module - <<'NODE'
           import { readFileSync } from 'node:fs';
           for (const [directory, expected] of [['win-unpacked', 0x8664], ['win-ia32-unpacked', 0x14c]]) {
@@ -311,14 +306,7 @@ jobs:
           done
           codesign --verify --deep --strict "$app"
           test -f "$release/PI-Desktop-$version-universal.dmg"
-          if [[ "$MACOS_SIGN_RELEASE" == "true" ]]; then
-            node scripts/write-macos-update-feed.mjs "$release"
-            test -f "$release/PI-Desktop-$version-universal-mac.zip"
-            test -s "$release/latest-mac.yml"
-          fi
-          test -s "$release/manual-mac.yml"
-
-      - name: Upload installer and update files
+      - name: Upload desktop installer
         uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.artifact }}
@@ -326,147 +314,42 @@ jobs:
           compression-level: 0
           path: |
             apps/desktop/release/PI-Desktop-*-universal.dmg
-            apps/desktop/release/PI-Desktop-*-universal-mac.zip
-            apps/desktop/release/PI-Desktop-*-universal-mac.zip.blockmap
             apps/desktop/release/PI-Desktop-Setup-*.exe
-            apps/desktop/release/PI-Desktop-Setup-*.exe.blockmap
-            apps/desktop/release/latest.yml
-            apps/desktop/release/latest-ia32.yml
-            apps/desktop/release/latest-mac.yml
-            apps/desktop/release/manual-mac.yml
-
-  pi-host-bundle:
-    name: Bundle pi-host (Linux ${{ matrix.arch }})
-    needs: verify
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Linux remote workspace targets. Keep this list in lockstep with
-          # PUBLISHED_TARGETS in apps/desktop/electron/main/remote/pi-host-release.ts:
-          # a bundle the desktop refuses to install is dead weight, and a target
-          # the desktop offers without a bundle fails mid-download.
-          - arch: x64
-            os: ubuntu-22.04
-            runner_arch: x86_64
-          - arch: arm64
-            os: ubuntu-22.04-arm
-            runner_arch: aarch64
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Compare tag with apps/desktop/package.json
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          APP_VERSION="$(node -p "require('./apps/desktop/package.json').version")"
-          if [ "$TAG_VERSION" != "$APP_VERSION" ]; then
-            echo "::error::Tag v$TAG_VERSION does not match apps/desktop/package.json version $APP_VERSION."
-            exit 1
-          fi
-
-      - name: Verify native runner architecture
-        if: matrix.runner_arch
-        run: |
-          set -euo pipefail
-          actual_arch="$(uname -m)"
-          expected_arch="${{ matrix.runner_arch }}"
-          if [ "$actual_arch" != "$expected_arch" ]; then
-            echo "::error::Expected $expected_arch runner, got $actual_arch."
-            exit 1
-          fi
-
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Build inputs (host-core, workspace, sidecar bundle)
-        run: |
-          set -euo pipefail
-          # Ubuntu 22.04 keeps the host-core glibc floor at 2.35, matching the
-          # desktop Linux build so the bundled binary loads on the same distros.
-          cargo build --release --locked -p host-core &
-          host_build_pid=$!
-          trap 'kill "$host_build_pid" 2>/dev/null || true' EXIT
-
-          pnpm install --frozen-lockfile
-          pnpm build:js
-          pnpm --filter @pi-desktop/agent-runtime bundle
-          pnpm --filter @pi-desktop/pi-host build
-
-          wait "$host_build_pid"
-          trap - EXIT
-
-      - name: Verify host-core glibc floor
-        run: node scripts/check-linux-host-glibc.mjs target/release/pi-desktop-host-core
-
-      - name: Assemble pi-host bundle
-        run: node apps/pi-host/scripts/bundle.mjs --platform linux --arch ${{ matrix.arch }}
-
-      - name: Archive bundle with checksum
-        run: |
-          set -euo pipefail
-          VERSION="$(node -p "require('./apps/pi-host/package.json').version")"
-          name="pi-host-${VERSION}-linux-${{ matrix.arch }}"
-          out="apps/pi-host/dist-bundle"
-          if [ ! -d "$out/$name" ]; then
-            echo "::error::expected bundle directory $out/$name"
-            ls -la "$out" || true
-            exit 1
-          fi
-          tar -czf "$out/${name}.tar.gz" -C "$out" "$name"
-          ( cd "$out" && sha256sum "${name}.tar.gz" > "${name}.tar.gz.sha256" )
-          cat "$out/${name}.tar.gz.sha256"
-
-      - name: Upload pi-host bundle
-        uses: actions/upload-artifact@v7
-        with:
-          name: pi-host-linux-${{ matrix.arch }}
-          if-no-files-found: error
-          compression-level: 0
-          path: |
-            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz
-            apps/pi-host/dist-bundle/pi-host-*-linux-${{ matrix.arch }}.tar.gz.sha256
 
   publish:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [configuration, build, pi-host-bundle]
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - uses: actions/download-artifact@v8
         with:
+          pattern: dist-*
           path: dist
           merge-multiple: true
 
-      - name: List artifacts
-        run: ls -la dist/
+      - name: Prepare the installer checksums
+        run: node scripts/write-desktop-release-notes.mjs "${GITHUB_REF_NAME#v}"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          # The installers, their updater feeds, and SSH host dependencies.
-          files: dist/*
+          name: iAgent Desktop ${{ github.ref_name }}
+          files: |
+            dist/PI-Desktop-Setup-*.exe
+            dist/PI-Desktop-*-universal.dmg
+          body_path: desktop-release-notes.md
           generate_release_notes: true
-          body: |
-            - **Windows** uses one setup executable for x86 and x64.
-            - **macOS** uses one Universal DMG for Apple Silicon and Intel.
-
-            ${{ needs.configuration.outputs.macos_signed == 'true' && 'The macOS app is Developer ID signed and notarized. In-app installation is available.' || 'Use the DMG to install macOS updates after checking for them in the app.' }}
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -86,7 +86,7 @@ levels does not waive the relevant E2E gate.
 
 | Requirement | Detail |
 |---|---|
-| Platform | macOS Universal (arm64 and x64), Windows Universal (x86 and x64), and Linux SSH host archives (x64 and arm64) |
+| Platform | macOS Universal (arm64 and x64) and Windows Universal (x86 and x64) |
 | Profile | Clean `~/.pi-desktop` profile (no prior config) |
 | Fixtures | Sample project directory (`examples/fixtures/sample-project/`) |
 | Sample plugin | `examples/plugins/hello` loaded from local path |

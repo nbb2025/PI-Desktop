@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release build for macOS: Developer ID-signed and notarized universal DMG/ZIP.
+# Release build for macOS: Developer ID-signed and notarized universal DMG.
 #
 # Local builds without a certificate remain unsigned. This script injects a
 # real signing identity and requires notarization credentials:
@@ -58,8 +58,7 @@ PI_STAPLER_MAX_ATTEMPTS="${PI_STAPLER_MAX_ATTEMPTS:-6}" \
 PI_STAPLER_RETRY_DELAY_SECONDS="${PI_STAPLER_RETRY_DELAY_SECONDS:-10}" \
 DEBUG="${DEBUG:-electron-osx-sign*,electron-notarize*}" \
   node scripts/macos-signing-watchdog.mjs --label "release-macos-universal" -- \
-  pnpm --filter @pi-desktop/desktop run dist:mac --signed-macos \
-    -c.extraMetadata.piMacUpdates=true \
+  pnpm --filter @pi-desktop/desktop run dist:mac \
     -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
     -c.mac.forceCodeSigning=true \
     -c.mac.notarize=true
@@ -72,7 +71,5 @@ scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
 
 echo "==> Verifying the signed and notarized release"
 scripts/verify-macos-release.sh apps/desktop/release
-
-node scripts/write-macos-update-feed.mjs apps/desktop/release
 
 echo "==> Done. Artifacts in apps/desktop/release/"

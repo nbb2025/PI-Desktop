@@ -576,9 +576,9 @@ Agent / Plan / Goal
 | macOS | Apple 芯片和 Intel | 通用 DMG |
 | Windows | x86 和 x64 | 通用 EXE |
 
-Windows 安装包自动选择对应架构，支持应用内更新。macOS 可在应用内检查新版并下载安装包，配置 Developer ID 并完成 Apple 公证后可在应用内安装更新。
+Windows 安装包自动选择对应架构，支持应用内更新。macOS 在应用内检查新版，使用 DMG 安装。从 v0.24.0 升级时，请手动下载一次新版安装包。
 
-Linux 桌面包可按[发布手册](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages)本地构建。发布页中的 `pi-host` 文件用于 SSH 远程工作区。
+Linux 桌面包可按[发布手册](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages)本地构建。自动部署 SSH 远程工作区需要另行提供匹配版本的主机包。
 
 ---
 

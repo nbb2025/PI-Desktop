@@ -245,7 +245,8 @@
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "PI-Desktop",
       "artifactName": "PI-Desktop-Setup-${version}.${ext}",
-      "buildUniversalInstaller": true
+      "buildUniversalInstaller": true,
+      "differentialPackage": false
     },
     "deb": {
       "packageName": "pi-desktop",

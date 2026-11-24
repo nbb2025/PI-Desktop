@@ -1,7 +1,6 @@
 # 06. Desktop Release Runbook
 
-> Scope: iAgent tag assets for macOS Universal and Windows Universal,
-> updater files, and Linux `pi-host` archives for SSH workspaces.
+> Scope: one macOS Universal DMG and one Windows Universal NSIS installer.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
 ## 1. Build lanes
@@ -190,25 +189,22 @@ export APPLE_TEAM_ID=...
 scripts/release-macos.sh
 ```
 
-Artifacts land in `apps/desktop/release/`. The local signed lane produces
-one Universal DMG, the updater ZIP and feed, and a manual feed describing the
-stapled DMG.
+The local signed lane writes one notarized Universal DMG in
+`apps/desktop/release/`.
 
 ### 4.3 GitHub tag and manual workflow
 
 Push a version tag such as `v0.24.0` on a validated commit to
 [`nbb2025/PI-Desktop`](https://github.com/nbb2025/PI-Desktop). The tag must
 match the version in `apps/desktop/package.json`. The Release workflow verifies
-the workspace before the native packaging matrix, then publishes the complete
-set of artifacts and updater metadata. A manual workflow dispatch builds
-artifacts without publishing a release.
+the workspace before packaging. A tag uploads the two installers. A manual
+workflow dispatch keeps the installers as Actions artifacts.
 
 Windows publishes `PI-Desktop-Setup-<version>.exe`. The installer carries
 both x86 and x64 Electron apps with their matching Rust host cores and
 chooses the compatible one during installation. The workflow verifies both
-PE machine types. `latest.yml` and `latest-ia32.yml` reference the same
-installer and preserve upgrades from both older Windows packages. Native
-voice libraries that only ship Windows x64 binaries require an x64 app.
+PE machine types. Both architectures discover the same installer with the
+GitHub Releases API and download the complete NSIS executable. Native voice libraries that only ship Windows x64 binaries require an x64 app.
 
 macOS publishes `PI-Desktop-<version>-universal.dmg`. The macOS runner builds
 both Rust targets and combines them with `lipo`. Electron Builder merges the
@@ -216,8 +212,9 @@ two Electron architectures. Both the app executable and its Rust host must
 contain arm64 and x86_64. The workflow selects Developer ID signing when all
 five repository secrets are available and rejects incomplete configurations.
 A tag with all five absent produces an ad-hoc-signed DMG for manual
-installation. `manual-mac.yml` hashes the final DMG. The signed lane adds a
-Universal ZIP and `latest-mac.yml` for in-app installation.
+installation. Both macOS delivery lanes check for new releases in the app
+and link to the DMG. The Electron macOS updater requires a signed app and a
+ZIP update payload for in-app installation.
 
 For the signed lane, electron-builder signs and notarizes the application.
 The DMG then receives separate notarization and stapling. Before upload,
@@ -237,21 +234,23 @@ tickets on the app and DMG.
 The DMG uses a branded 720×440 background with a two-icon drag-to-Applications
 gesture. The app and Applications link are the only items in the window.
 
-The signed macOS updater ZIP contains `PI-Desktop.app` at its root. Neither the DMG nor ZIP
-ships an opening-help note or executable first-launch helper, including local
-and manual-install builds. Apple Gatekeeper qualification requires Developer ID
-signing and notarization.
+The DMG ships the app and its Applications link. Apple Gatekeeper
+qualification requires Developer ID signing and notarization.
 
-The workflow uploads the installers and their updater files as temporary
-Actions artifacts with compression level zero. It also publishes the two
-version-matched Linux `pi-host` archives and their checksums for SSH workspace
-bootstrap. Desktop Linux packages are available through local or manually
-dispatched validation builds.
+The workflow uploads exactly the two installers as temporary Actions
+artifacts with compression level zero. The publishing job verifies their
+versioned names and writes a SHA-512 entry per installer into a hidden comment
+in the GitHub Release description. Windows checks the checksum during download.
+Users on v0.24.0 upgrade by downloading the installer once.
+
+Linux packages are available through local or manually dispatched validation
+builds. Automated SSH bootstrap requires a separately supplied matching release
+archive. Configured remote hosts can still be connected directly.
 
 ### 4.4 Release and feedback URLs
 
-Installer metadata, release discovery, SSH host assets and the feedback
-form use the iAgent GitHub repository. The application homepage is
+Installer metadata, release discovery, and the feedback form use the iAgent
+GitHub repository. The application homepage is
 `https://ai.iagent.dev`.
 
 ### 4.5 GitHub Actions secrets for macOS signing
@@ -361,7 +360,7 @@ artifact per submission and electron-builder only covers the app:
 
 | Artifact | Submitted by | Ticket |
 |---|---|---|
-| `PI-Desktop.app` (inside the ZIP) | electron-builder `-c.mac.notarize=true` | stapled and validated by electron-builder through the watchdog's bounded stapler retry shim |
+| `PI-Desktop.app` (inside the DMG) | electron-builder `-c.mac.notarize=true` | stapled and validated by electron-builder through the watchdog's bounded stapler retry shim |
 | `PI-Desktop-<version>-universal.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled and validated by the same script after `status: Accepted` |
 
 A DMG that was never submitted has no ticket, so stapling it fails with
@@ -550,18 +549,10 @@ Shell smoke on each native runner:
 
 ## 7. Known limitations
 
-- Windows NSIS and Developer ID-signed macOS builds support in-app
-  installation. The macOS manual lane and older Windows portable installs
-  check for updates and link to the current release.
-- The Linux SSH host archives are built on Ubuntu 22.04 (native
-  `ubuntu-22.04` and `ubuntu-22.04-arm` runners) and require glibc 2.35 or newer
-  (Ubuntu 22.04, Debian 12, Fedora 36+). Each SSH archive job runs
-  `scripts/check-linux-host-glibc.mjs` and refuses a binary that needs a
-  newer glibc.
+- Windows NSIS supports in-app installation. macOS releases install updates
+  from the DMG. Existing iAgent v0.24.0 installations upgrade manually once.
 - Linux arm64 microphone capture works on Raspberry Pi boards only:
   `@picovoice/pvrecorder-node` classifies Linux arm64 by `/proc/cpuinfo` CPU
   part. Speech-to-text (`transcribe-cpp` ships a `linux-arm64-cpu-vulkan`
   bundle) and every other feature work on any arm64 Linux device.
-- Rollback, staged rollout, and prerelease channel policy remain open release
-  work. Existing unsigned macOS installs may need one manual signed DMG before
-  in-app updates succeed.
+- Rollback, staged rollout, and prerelease channel policy remain open release work.
