@@ -66,10 +66,9 @@ when macOS `iconutil` is available, without overwriting the canonical source.
   `EHOSTUNREACH` even though the main process's Test Provider fetch succeeds
   (issue #573).
 - `Resources/bin/pi-desktop-host-core` — Rust host binary (release build).
-- Windows NSIS builds include an x64 `pi-desktop-host-core.exe` statically
-  linked to the MSVC CRT, so a clean Windows x64 or Windows 11 ARM64
-  (x64-emulated) installation does not need a separate Visual C++
-  Redistributable before the local service can start.
+- Windows NSIS builds include x86 and x64 `pi-desktop-host-core.exe` payloads
+  statically linked to the MSVC CRT. The Rust host on a clean install starts
+  without a separate Visual C++ Redistributable.
 - `Resources/agent-runtime/` — bundled sidecar, executed with
   `ELECTRON_RUN_AS_NODE=1` (no separate Node shipped).
 - `Resources/licenses/` — notices that must remain distributable when the
