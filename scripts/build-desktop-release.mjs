@@ -14,6 +14,14 @@ if (target !== nativeTarget) {
   throw new Error(`The ${target} release requires a native runner for that platform.`);
 }
 
+const macArchitectureFlags = target === "mac"
+  ? args.filter((arg) => /^--(?:arm64|x64|universal|ia32|arm|armv7l)(?:=|$)/.test(arg))
+  : [];
+const macArch = macArchitectureFlags[0]?.slice(2) ?? process.arch;
+if (target === "mac" && (macArchitectureFlags.length > 1 || !["arm64", "x64"].includes(macArch))) {
+  throw new Error("Build one macOS DMG at a time with --arm64 or --x64.");
+}
+
 const pnpmCommand = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
 function runBuilder(builderArgs) {
@@ -41,15 +49,15 @@ function runBuilder(builderArgs) {
   });
 }
 
-prepareDesktopHost(target !== "linux");
+prepareDesktopHost(target === "win", macArch);
 
 const builderTargets = {
   win: ["--win", "nsis", "--x64", "--ia32"],
-  mac: ["--mac", "dmg", "--universal"],
+  mac: ["--mac", "dmg", `--${macArch}`],
   linux: ["--linux"],
 };
 await runBuilder([
   ...builderTargets[target],
   "--publish", "never",
-  ...args,
+  ...args.filter((arg) => !macArchitectureFlags.includes(arg)),
 ]);

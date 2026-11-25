@@ -91,6 +91,7 @@
     "directories": {
       "output": "release"
     },
+    "artifactBuildCompleted": "../../scripts/compress-macos-dmg.mjs",
     "publish": [
       {
         "provider": "github",
@@ -179,15 +180,14 @@
       },
       "extraResources": [
         {
-          "from": "../../target/release/pi-desktop-host-core",
+          "from": "../../target/desktop-release/${arch}/pi-desktop-host-core",
           "to": "bin/pi-desktop-host-core"
         },
         {
           "from": "build/tray-icon-mac.png",
           "to": "tray-icon-mac.png"
         }
-      ],
-      "x64ArchFiles": "**/app.asar.unpacked/node_modules/{@transcribe-cpp,@koromix,@picovoice}/**"
+      ]
     },
     "dmg": {
       "artifactName": "PI-Desktop-${version}-${arch}.${ext}",

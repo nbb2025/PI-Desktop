@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 const require = createRequire(import.meta.url);
@@ -226,7 +229,7 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
 
-test("macOS publishes a single Universal DMG", () => {
+test("macOS packages a DMG and host sidecar for the selected architecture", () => {
   const macTargets = packageJson.build.mac.target;
   assert.deepEqual(
     macTargets.map((entry) => entry.target),
@@ -234,10 +237,69 @@ test("macOS publishes a single Universal DMG", () => {
   );
   assert.ok(
     macTargets.every((entry) => entry.arch === undefined),
-    "the release wrapper selects the universal architecture",
+    "the release wrapper selects the architecture for each package",
   );
+  assert.equal(packageJson.build.dmg.artifactName, "PI-Desktop-${version}-${arch}.${ext}");
+  assert.ok(packageJson.build.mac.extraResources.some(({ from, to }) =>
+    from === "../../target/desktop-release/${arch}/pi-desktop-host-core" &&
+    to === "bin/pi-desktop-host-core",
+  ));
   assert.equal(packageJson.build.dmg.writeUpdateInfo, false);
   assert.doesNotMatch(packageJson.scripts["dist:mac"], /--(?:arm64|x64)/);
+});
+
+async function macDmgArtifactHook() {
+  const modulePath = packageJson.build.artifactBuildCompleted;
+  assert.ok(modulePath, "electron-builder must run the compression hook");
+  const { default: hook } = await import(new URL(`../${modulePath}`, import.meta.url));
+  return hook;
+}
+
+function dmgEvent(file, dmg = {}) {
+  return { file, target: { name: "dmg" }, packager: { config: { dmg } }, isWriteUpdateInfo: false };
+}
+
+test("the DMG hook respects other targets, signing, update metadata and explicit formats", async () => {
+  const hook = await macDmgArtifactHook();
+  const file = "must-not-be-opened.dmg";
+  await hook({ ...dmgEvent(file), target: { name: "nsis" } });
+  await hook(dmgEvent(file, { sign: true }));
+  await hook({ ...dmgEvent(file), isWriteUpdateInfo: true });
+  await hook(dmgEvent(file, { format: "ULFO" }));
+});
+
+test("macOS recompresses the release DMG in place and preserves it on failure", {
+  skip: process.platform !== "darwin",
+}, async (t) => {
+  const hook = await macDmgArtifactHook();
+  const root = await mkdtemp(join(tmpdir(), "pi-packaging-dmg-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const contents = join(root, "contents");
+  const release = join(root, "release");
+  const name = `PI-Desktop-0.0.0-${process.arch}.dmg`;
+  const file = join(release, name);
+  await Promise.all([mkdir(contents), mkdir(release)]);
+  await writeFile(join(contents, "fixture.txt"), "PI-Desktop DMG fixture\n".repeat(100_000));
+  execFileSync("/usr/bin/hdiutil", [
+    "create", "-quiet", "-format", "UDZO", "-fs", "HFS+", "-srcfolder", contents, file,
+  ]);
+  const originalSize = (await stat(file)).size;
+
+  await hook(dmgEvent(file));
+  assert.ok((await stat(file)).size < originalSize);
+  const info = execFileSync("/usr/bin/hdiutil", ["imageinfo", "-plist", file]);
+  const format = execFileSync("/usr/bin/plutil", ["-extract", "Format", "raw", "-o", "-", "-"], {
+    input: info,
+    encoding: "utf8",
+  });
+  assert.equal(format.trim(), "ULMO");
+  assert.deepEqual(await readdir(release), [name]);
+
+  const unreadable = Buffer.from("invalid disk image");
+  await writeFile(file, unreadable);
+  await assert.rejects(hook(dmgEvent(file)), /hdiutil/);
+  assert.deepEqual(await readFile(file), unreadable);
+  assert.deepEqual(await readdir(release), [name]);
 });
 
 test("macOS DMG remains a two-icon install and artifacts omit first-launch guidance", () => {

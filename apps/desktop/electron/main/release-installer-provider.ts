@@ -1,3 +1,4 @@
+import { app } from "electron";
 import electronUpdater from "electron-updater";
 import type { AppUpdater, UpdateInfo } from "electron-updater";
 import type { ProviderRuntimeOptions } from "electron-updater/out/providers/Provider";
@@ -8,7 +9,7 @@ const { Provider } = electronUpdater;
 const LATEST_RELEASE = new URL(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
 const STABLE_TAG = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const SHA512_BASE64 = /^[A-Za-z0-9+/]{86}==$/;
-type InstallerPlatform = "win32" | "darwin";
+type InstallerTarget = "win32" | "arm64" | "x64";
 
 function object(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -18,7 +19,7 @@ function object(value: unknown): Record<string, unknown> | undefined {
 
 function installerUpdate(
   payload: unknown,
-  platform: InstallerPlatform,
+  target: InstallerTarget,
   currentVersion: AppUpdater["currentVersion"],
 ): UpdateInfo {
   const release = object(payload);
@@ -35,15 +36,19 @@ function installerUpdate(
     return { version, releaseDate, files: [], path: "", sha512: "" };
   }
 
-  const filename = platform === "win32"
+  const preferredName = target === "win32"
     ? `PI-Desktop-Setup-${version}.exe`
-    : `PI-Desktop-${version}-universal.dmg`;
+    : `PI-Desktop-${version}-${target}.dmg`;
   const assets: unknown[] = Array.isArray(release.assets) ? release.assets : [];
-  const installer = assets.map(object).find((asset) =>
-    asset?.name === filename && asset.state === "uploaded",
-  );
+  const uploaded = assets.map(object).filter((asset) => asset?.state === "uploaded");
+  const installer = uploaded.find((asset) => asset?.name === preferredName) ??
+    (target === "win32" ? undefined : uploaded.find((asset) =>
+      asset?.name === `PI-Desktop-${version}-universal.dmg`,
+    ));
+  const filename = installer?.name;
   const size = installer?.size;
-  if (typeof size !== "number" || !Number.isSafeInteger(size) || size <= 0) {
+  if (typeof filename !== "string" || typeof size !== "number" ||
+      !Number.isSafeInteger(size) || size <= 0) {
     throw new Error("The latest desktop release is missing the installer for this platform");
   }
 
@@ -59,9 +64,9 @@ function installerUpdate(
   return { version, releaseDate, files: [{ url: filename, size, sha512 }], path: filename, sha512 };
 }
 
-/** Discover the two public installers without separate updater assets. */
+/** Discover the installer for this device without separate updater assets. */
 export class ReleaseInstallerProvider extends Provider<UpdateInfo> {
-  private readonly platform: InstallerPlatform;
+  private readonly target: InstallerTarget;
   private readonly updater: AppUpdater;
 
   constructor(_options: unknown, updater: AppUpdater, options: ProviderRuntimeOptions) {
@@ -69,14 +74,15 @@ export class ReleaseInstallerProvider extends Provider<UpdateInfo> {
     if (options.platform !== "win32" && options.platform !== "darwin") {
       throw new Error("The desktop installer provider requires Windows or macOS");
     }
-    this.platform = options.platform;
+    const macArch = process.arch === "arm64" || app.runningUnderARM64Translation ? "arm64" : "x64";
+    this.target = options.platform === "win32" ? "win32" : macArch;
     this.updater = updater;
   }
 
   async getLatestVersion(): Promise<UpdateInfo> {
     const response = await this.httpRequest(LATEST_RELEASE, { Accept: "application/vnd.github+json" });
     const payload: unknown = JSON.parse(response ?? "null");
-    return installerUpdate(payload, this.platform, this.updater.currentVersion);
+    return installerUpdate(payload, this.target, this.updater.currentVersion);
   }
 
   resolveFiles(update: UpdateInfo): ResolvedUpdateFileInfo[] {

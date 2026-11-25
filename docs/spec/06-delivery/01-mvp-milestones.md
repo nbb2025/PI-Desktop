@@ -175,8 +175,8 @@ Remaining work is tracked as product hardening rather than unstarted MVP scope:
 
 ## Release constraint
 
-iAgent tag releases publish one **macOS Universal DMG** for Apple Silicon
-and Intel and one **Windows Universal installer** for x86 and x64.
+iAgent tag releases publish one **native macOS DMG per architecture** for Apple
+Silicon and Intel and one **Windows Universal installer** for x86 and x64.
 
 ## Rough effort (solo)
 

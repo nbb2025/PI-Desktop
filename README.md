@@ -578,10 +578,11 @@ Agent / Plan / Goal
 
 | Platform | Architecture | Installer |
 | -------- | ------------ | --------- |
-| macOS | Apple Silicon and Intel | Universal DMG |
+| macOS | Apple Silicon (arm64) | `-arm64.dmg` |
+| macOS | Intel (x64) | `-x64.dmg` |
 | Windows | x86 and x64 | Universal NSIS installer |
 
-The Windows installer selects the correct architecture and supports in-app updates. The macOS app checks for updates and links to the DMG for installation. Upgrade from v0.24.0 by downloading the installer once.
+The Windows installer selects the correct architecture and supports in-app updates. On macOS, choose the DMG for your Mac. If upgrading from a Universal DMG, download the matching installer manually once. Subsequent macOS builds check for updates for that architecture. Windows v0.24.0 also needs one manual upgrade.
 
 Linux desktop packages can be built locally using the [release runbook](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages). SSH workspace bootstrap requires a separately supplied matching host bundle.
 

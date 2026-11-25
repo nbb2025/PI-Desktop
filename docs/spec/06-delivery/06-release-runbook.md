@@ -1,6 +1,6 @@
 # 06. Desktop Release Runbook
 
-> Scope: one macOS Universal DMG and one Windows Universal NSIS installer.
+> Separate macOS arm64 and x64 DMGs and one Windows Universal NSIS installer.
 > Cross-references: [milestones](01-mvp-milestones.md) · [process model](../03-runtime/07-process-model.md) · [security](../05-security/01-security.md)
 
 ## 1. Build lanes
@@ -47,9 +47,9 @@ when macOS `iconutil` is available, without overwriting the canonical source.
    the iAgent publisher and Apple notarization credentials for the same team.
 2. For local signing, set `MAC_SIGNING_IDENTITY` to your certificate common
    name and set `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`.
-3. Install both Rust targets for the runner OS before packaging. macOS uses
-   `aarch64-apple-darwin` and `x86_64-apple-darwin`; Windows uses
-   `i686-pc-windows-msvc` and `x86_64-pc-windows-msvc`.
+3. Install the Rust target for the selected macOS installer
+   (`aarch64-apple-darwin` or `x86_64-apple-darwin`). The Windows installer
+   needs both `i686-pc-windows-msvc` and `x86_64-pc-windows-msvc`.
 
 ## 3. What the build ships
 
@@ -189,15 +189,16 @@ export APPLE_TEAM_ID=...
 scripts/release-macos.sh
 ```
 
-The local signed lane writes one notarized Universal DMG in
-`apps/desktop/release/`.
+The local signed lane writes and notarizes one native DMG in
+`apps/desktop/release/`. Use a release directory free of older macOS
+packages when running the single-artifact signing and verification steps.
 
 ### 4.3 GitHub tag and manual workflow
 
 Push a version tag such as `v0.24.0` on a validated commit to
 [`nbb2025/PI-Desktop`](https://github.com/nbb2025/PI-Desktop). The tag must
 match the version in `apps/desktop/package.json`. The Release workflow verifies
-the workspace before packaging. A tag uploads the two installers. A manual
+the workspace before packaging. A tag uploads the three installers. A manual
 workflow dispatch keeps the installers as Actions artifacts.
 
 Windows publishes `PI-Desktop-Setup-<version>.exe`. The installer carries
@@ -206,15 +207,23 @@ chooses the compatible one during installation. The workflow verifies both
 PE machine types. Both architectures discover the same installer with the
 GitHub Releases API and download the complete NSIS executable. Native voice libraries that only ship Windows x64 binaries require an x64 app.
 
-macOS publishes `PI-Desktop-<version>-universal.dmg`. The macOS runner builds
-both Rust targets and combines them with `lipo`. Electron Builder merges the
-two Electron architectures. Both the app executable and its Rust host must
-contain arm64 and x86_64. The workflow selects Developer ID signing when all
-five repository secrets are available and rejects incomplete configurations.
-A tag with all five absent produces an ad-hoc-signed DMG for manual
-installation. Both macOS delivery lanes check for new releases in the app
-and link to the DMG. The Electron macOS updater requires a signed app and a
-ZIP update payload for in-app installation.
+macOS publishes `PI-Desktop-<version>-arm64.dmg` for Apple Silicon and
+`PI-Desktop-<version>-x64.dmg` for Intel. Each native job builds its matching
+Rust target and verifies that the Electron framework, app executable and
+Rust host each have only the advertised architecture. The workflow selects
+Developer ID signing when all five repository secrets are available and
+rejects incomplete configurations. A tag with all five absent produces two
+ad-hoc-signed DMGs for manual installation. The generated Release Notes for
+those DMGs tell users to drag the app to Applications and then run
+`xattr -cr /Applications/PI-Desktop.app` in Terminal before opening it.
+
+macOS update checks select the matching DMG from the GitHub release, including
+arm64 for Apple Silicon users running an Intel build under Rosetta. New
+clients can still recognize a legacy Universal DMG. Users upgrading from a
+Universal build need to download their first architecture-specific DMG
+manually because their installed updater expects the old asset name. Both
+macOS lanes link to the release page for installation. Electron's automatic
+macOS installation requires a signed app and a ZIP update payload.
 
 For the signed lane, electron-builder signs and notarizes the application.
 The DMG then receives separate notarization and stapling. Before upload,
@@ -234,14 +243,13 @@ tickets on the app and DMG.
 The DMG uses a branded 720×440 background with a two-icon drag-to-Applications
 gesture. The app and Applications link are the only items in the window.
 
-The DMG ships the app and its Applications link. Apple Gatekeeper
-qualification requires Developer ID signing and notarization.
+Apple Gatekeeper qualification requires Developer ID signing and notarization.
 
-The workflow uploads exactly the two installers as temporary Actions
+The workflow uploads exactly the three installers as temporary Actions
 artifacts with compression level zero. The publishing job verifies their
 versioned names and writes a SHA-512 entry per installer into a hidden comment
 in the GitHub Release description. Windows checks the checksum during download.
-Users on v0.24.0 upgrade by downloading the installer once.
+Windows users on v0.24.0 upgrade by downloading the installer once.
 
 Linux packages are available through local or manually dispatched validation
 builds. Automated SSH bootstrap requires a separately supplied matching release
@@ -361,7 +369,7 @@ artifact per submission and electron-builder only covers the app:
 | Artifact | Submitted by | Ticket |
 |---|---|---|
 | `PI-Desktop.app` (inside the DMG) | electron-builder `-c.mac.notarize=true` | stapled and validated by electron-builder through the watchdog's bounded stapler retry shim |
-| `PI-Desktop-<version>-universal.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled and validated by the same script after `status: Accepted` |
+| `PI-Desktop-<version>-<arch>.dmg` | `scripts/notarize-and-staple-macos-release-dmg.sh` (`notarytool submit --wait`) | stapled and validated by the same script after `status: Accepted` |
 
 A DMG that was never submitted has no ticket, so stapling it fails with
 `Could not find base64 encoded ticket ... Error 65`. Stapler retries are only
@@ -526,10 +534,21 @@ Windows: pnpm --filter @pi-desktop/desktop run dist:win
 Linux:   pnpm --filter @pi-desktop/desktop run dist:linux
 ```
 
-macOS and Windows produce their Universal DMG and NSIS installer
-respectively. Previous portable Windows installs keep manual update
-discovery and can download the current NSIS installer. Existing application
-data stays in the same directory.
+The macOS command defaults to the architecture of the running Node process
+and accepts `--arm64` or `--x64` for one DMG at a time. To cross-build locally,
+provide the matching Rust target and native dependencies. Windows produces
+one Universal NSIS installer. Previous portable Windows installs keep manual
+update discovery and can download the current NSIS installer. Existing
+application data stays in the same directory.
+
+The macOS release uses LZMA (`ULMO`) when it makes the DMG smaller.
+The build verifies the compressed image before replacing the original, before
+release checksums or DMG notarization. The result keeps the original app
+and drag-to-Applications layout. Expect a smaller download and
+more time to decompress the image. Installed app size is independent of DMG
+compression. The format requires macOS 10.15 or newer, within the app's
+supported range. Builds with explicit DMG formats, container signing, or
+DMG update metadata keep their configured output.
 
 The manual Linux command targets the native runner architecture and builds
 AppImage, deb, and rpm. RPM targets pass `_build_id_links none` to FPM to

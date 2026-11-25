@@ -6,7 +6,7 @@
 #   node scripts/release.mjs 0.2.0 --tag   # bump versions + commit + create tag v0.2.0
 #   git push origin <branch> v0.2.0        # push → this workflow builds & publishes
 #
-# Publish one Windows NSIS installer for x86/x64 and one macOS Universal DMG.
+# Publish one Windows NSIS installer for x86/x64 and a DMG per macOS architecture.
 # Installer checksums live in the release description.
 
 name: Release
@@ -116,15 +116,23 @@ jobs:
     needs: [configuration, verify]
     env:
       MACOS_SIGN_RELEASE: ${{ needs.configuration.outputs.macos_signed }}
+      MACOS_ARCH: ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: macOS Universal
-            os: macos-15-intel
-            artifact: mac
+          - name: macOS Apple Silicon
+            os: macos-15
+            artifact: mac-arm64
             platform: macos
-            rust_targets: x86_64-apple-darwin,aarch64-apple-darwin
+            arch: arm64
+            rust_targets: aarch64-apple-darwin
+          - name: macOS Intel
+            os: macos-15-intel
+            artifact: mac-x64
+            platform: macos
+            arch: x64
+            rust_targets: x86_64-apple-darwin
           - name: Windows Universal
             os: windows-latest
             artifact: windows
@@ -187,7 +195,7 @@ jobs:
         if: matrix.platform == 'macos' && env.MACOS_SIGN_RELEASE != 'true'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: pnpm --filter @pi-desktop/desktop run dist:mac -c.mac.identity=-
+        run: pnpm --filter @pi-desktop/desktop run dist:mac "--$MACOS_ARCH" -c.mac.identity=-
 
       - name: Diagnose macOS signing environment
         # Records the runner baseline (system, codesign, identities, keychain,
@@ -232,8 +240,8 @@ jobs:
           # per-file codesign timings, and fails the step after
           # PI_SIGNING_TIMEOUT_SECONDS instead of waiting for the job timeout.
           node scripts/macos-signing-watchdog.mjs \
-            --label "dist:mac-universal" \
-            -- pnpm --filter @pi-desktop/desktop run dist:mac \
+            --label "dist:mac-$MACOS_ARCH" \
+            -- pnpm --filter @pi-desktop/desktop run dist:mac "--$MACOS_ARCH" \
               -c.mac.forceCodeSigning=true \
               -c.mac.notarize=true
 
@@ -261,7 +269,7 @@ jobs:
           # notarytool submit --wait blocks until Apple answers; the watchdog
           # keeps that wait observable and bounded.
           node scripts/macos-signing-watchdog.mjs \
-            --label "notarize-dmg-universal" \
+            --label "notarize-dmg-$MACOS_ARCH" \
             -- scripts/notarize-and-staple-macos-release-dmg.sh apps/desktop/release
 
       - name: Verify signed and notarized macOS installer
@@ -293,19 +301,29 @@ jobs:
           }
           NODE
 
-      - name: Verify macOS universal application and artifacts
+      - name: Verify macOS application and DMG architecture
         if: matrix.platform == 'macos'
         run: |
           set -euo pipefail
+          shopt -s nullglob
           release=apps/desktop/release
           version="$(node -p "require('./apps/desktop/package.json').version")"
-          app="$release/mac-universal/PI-Desktop.app"
-          for arch in arm64 x86_64; do
-            lipo "$app/Contents/MacOS/PI-Desktop" -verify_arch "$arch"
-            lipo "$app/Contents/Resources/bin/pi-desktop-host-core" -verify_arch "$arch"
+          apps=("$release"/mac*/PI-Desktop.app)
+          installers=("$release"/*.dmg)
+          test "${#apps[@]}" -eq 1
+          test "${#installers[@]}" -eq 1
+          test "${installers[0]}" = "$release/PI-Desktop-$version-$MACOS_ARCH.dmg"
+          macho_arch="$MACOS_ARCH"
+          if [[ "$macho_arch" == "x64" ]]; then macho_arch=x86_64; fi
+          app="${apps[0]}"
+          for binary in "MacOS/PI-Desktop" "Resources/bin/pi-desktop-host-core" "Frameworks/Electron Framework.framework/Electron Framework"; do
+            actual="$(lipo -archs "$app/Contents/$binary")"
+            if [[ "$actual" != "$macho_arch" ]]; then
+              echo "::error::$binary has architecture $actual, expected $macho_arch"
+              exit 1
+            fi
           done
           codesign --verify --deep --strict "$app"
-          test -f "$release/PI-Desktop-$version-universal.dmg"
       - name: Upload desktop installer
         uses: actions/upload-artifact@v7
         with:
@@ -313,13 +331,14 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           path: |
-            apps/desktop/release/PI-Desktop-*-universal.dmg
+            apps/desktop/release/PI-Desktop-*-arm64.dmg
+            apps/desktop/release/PI-Desktop-*-x64.dmg
             apps/desktop/release/PI-Desktop-Setup-*.exe
 
   publish:
     name: Publish GitHub Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [configuration, build]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -339,7 +358,9 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Prepare the installer checksums
+      - name: Prepare release notes and installer checksums
+        env:
+          MACOS_SIGN_RELEASE: ${{ needs.configuration.outputs.macos_signed }}
         run: node scripts/write-desktop-release-notes.mjs "${GITHUB_REF_NAME#v}"
 
       - name: Create GitHub Release
@@ -348,7 +369,8 @@ jobs:
           name: iAgent Desktop ${{ github.ref_name }}
           files: |
             dist/PI-Desktop-Setup-*.exe
-            dist/PI-Desktop-*-universal.dmg
+            dist/PI-Desktop-*-arm64.dmg
+            dist/PI-Desktop-*-x64.dmg
           body_path: desktop-release-notes.md
           generate_release_notes: true
           fail_on_unmatched_files: true
