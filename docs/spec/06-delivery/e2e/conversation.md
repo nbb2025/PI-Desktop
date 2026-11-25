@@ -471,8 +471,10 @@ folder/mixed-selection behavior. No system clipboard contents are changed.
   Electron. Type three lines, click the end of line one, insert one break, click
   each painted line, then type and backspace at the end. Check the exact draft,
   line geometry, selection and caret, including an empty last line, consecutive
-  breaks, native undo/redo of both insertion and Backspace, and IME preedit/commit. On a disposable desktop with
-  its own empty clipboard, add `--isolated-clipboard` to check native copy as well.
+  breaks, native undo/redo of both insertion and Backspace, and IME
+  preedit/commit. Type after undoing Backspace to confirm the caret places the
+  text on the restored line. On a disposable desktop with its own empty
+  clipboard, add `--isolated-clipboard` to check native copy as well.
   The full Settings-to-send journey remains Draft; this lane needs no provider.
 
 ## E2E-008e: Host speech transcribe and speak

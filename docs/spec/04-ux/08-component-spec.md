@@ -4811,7 +4811,9 @@ text, so it cannot be selected, copied or typed, never merges into a neighbourin
 text node, and the draft string and its indices are unchanged; the end-of-draft
 caret sits before the placeholder, on the empty line, and the placeholder is
 inert after ordinary text. A terminal placeholder can remain as the browser's
-undo anchor: undoing Backspace restores both the empty line and its caret.
+undo anchor. Undoing Backspace from a caret on the empty line restores the line
+and places the caret there. Undo of an explicit selection preserves the
+browser's selection behavior.
 At the draft end a single native edit inserts the real break and the layout
 placeholder, so undo and redo cover both. Elsewhere Shift+Enter stays native;
 plain Enter in multiline mode uses the same native line-break command instead

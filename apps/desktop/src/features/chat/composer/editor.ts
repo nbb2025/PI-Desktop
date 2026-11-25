@@ -118,6 +118,14 @@ function isTailPlaceholder(node: Node): boolean {
   );
 }
 
+/** Find the real break immediately before the empty last line's placeholder. */
+export function editorTailBreak(el: HTMLElement): HTMLBRElement | null {
+  const placeholder = el.lastChild;
+  if (!placeholder || !isTailPlaceholder(placeholder)) return null;
+  const lineBreak = placeholder.previousSibling;
+  return lineBreak instanceof HTMLBRElement && !isTailPlaceholder(lineBreak) ? lineBreak : null;
+}
+
 function createTailPlaceholder(): HTMLBRElement {
   const br = document.createElement("br");
   br.setAttribute(TAIL_PLACEHOLDER, "");

@@ -1,4 +1,4 @@
-import { editorIndexAt, editorSelectionRange, readEditorValue, setEditorCaret } from "./editor";
+import { editorIndexAt, editorSelectionRange, editorTailBreak, readEditorValue, setEditorCaret } from "./editor";
 
 type DeletionSnapshot = { expected: string; breaks: Set<HTMLBRElement> };
 
@@ -16,6 +16,7 @@ export function installComposerDeletionGuard(
   // Chromium reuses its original BR node on redo. Remember only nodes proven
   // spurious, never a string pattern that could also be an intentional newline.
   const placeholders = new WeakSet<HTMLBRElement>();
+  const tailBackspaces = new WeakSet<HTMLBRElement>();
   let snapshot: DeletionSnapshot | null = null;
   const atDraftEnd = () => editorSelectionRange(editor).end === readEditorValue(editor).length;
   const beforeInput = (event: InputEvent) => {
@@ -43,6 +44,17 @@ export function installComposerDeletionGuard(
     const before = readEditorValue(editor);
     const start = editorIndexAt(editor, range.startContainer, range.startOffset);
     const end = editorIndexAt(editor, range.endContainer, range.endOffset);
+    const tailBreak = end === before.length && start < end ? editorTailBreak(editor) : null;
+    if (tailBreak) {
+      if (
+        event.inputType === "deleteContentBackward" && start === end - 1 &&
+        editor.ownerDocument.getSelection()?.isCollapsed
+      ) {
+        tailBackspaces.add(tailBreak);
+      } else {
+        tailBackspaces.delete(tailBreak);
+      }
+    }
     snapshot = {
       expected: before.slice(0, start) + before.slice(end),
       breaks: new Set(editor.querySelectorAll("br")),
@@ -51,6 +63,16 @@ export function installComposerDeletionGuard(
   const input = (event: Event) => {
     const deletion = snapshot;
     snapshot = null;
+    if (event instanceof InputEvent && event.inputType === "historyUndo") {
+      const tailBreak = editorTailBreak(editor);
+      if (tailBreak && tailBackspaces.has(tailBreak)) {
+        // Chromium can select the restored BR even when Backspace started at
+        // a caret. Restore the caret so typing continues on the empty line.
+        const { start, end } = editorSelectionRange(editor);
+        if (start === end - 1 && end === readEditorValue(editor).length) setEditorCaret(editor, end);
+      }
+      return;
+    }
     if (event instanceof InputEvent && event.inputType === "historyRedo") {
       for (const br of editor.querySelectorAll("br")) {
         if (placeholders.has(br)) br.remove();
