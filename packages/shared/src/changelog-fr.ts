@@ -2,11 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const frEntries: ChangelogEntry[] = [
   {
-    version: "0.24.2",
+    version: "0.24.3",
     date: "2026-11-25",
     highlights: [
       "iAgent utilise les paramètres GPT Image par défaut du studio web pour générer et retoucher les images.",
       "La conversation indique quand iAgent accepte une tâche. En cas d’échec, l’identifiant et le statut HTTP du serveur sont conservés. Les tâches longues bénéficient du délai complet de la passerelle.",
+      "Configurez des rôles et compétences propres à chaque mode. Vous pouvez afficher les sous-agents actifs au-dessus de la zone de saisie.",
+      "Les commandes Bash longues peuvent continuer en arrière-plan pendant que la conversation se poursuit.",
+      "Collez directement les fichiers image copiés dans la zone de saisie.",
+      "Les fenêtres macOS retrouvent correctement leur taille après une maximisation ou une sortie du plein écran.",
+      "Le gestionnaire de fichiers intégré 0.13.0 ajoute des onglets de documents, un historique et une synchronisation Git, ainsi que des indicateurs de chargement.",
     ],
   },
   {

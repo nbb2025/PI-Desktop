@@ -91,7 +91,10 @@ test("configure, batch generate, edit a result, replace binding, clear; files su
   await call({ items: [{ prompt: "replacement" }] });
   assert.equal(JSON.parse(requests.at(-1).body).model, "image-two");
   settings.imageGeneration = null;
-  assert.equal((await call({ items: [{ prompt: "unset" }] })).errorCode, "IMAGE_NOT_CONFIGURED");
+  const unavailable = await call({ items: [{ prompt: "unset" }] });
+  assert.equal(unavailable.errorCode, "IMAGE_NOT_CONFIGURED");
+  assert.match(unavailable.content.message, /Settings > Models > Image generation model/);
+  assert.match(unavailable.content.message, /Call MCP image tools directly/);
   assert.equal(requests.length, 6);
   assert.equal(settings.defaultModelId, "chat");
 });

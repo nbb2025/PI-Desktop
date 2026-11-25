@@ -744,8 +744,19 @@ async function main() {
       const first = randomUUID();
       const firstAnswer = randomUUID();
       const laterAnswer = randomUUID();
-      await append(user(first, "first prompt", first, 1, 1));
-      await append(assistant(firstAnswer, "first answer"));
+      const initialMessages = [
+        user(first, "first prompt", first, 1, 1),
+        assistant(firstAnswer, "first answer"),
+      ];
+      for (const message of initialMessages) await append(message);
+      // A root stamp only comes after the first revision is stored. Seed
+      // that history through the same RPC used during regeneration.
+      await host.call("session.saveRevision", {
+        sessionId,
+        rootUserId: first,
+        messages: initialMessages,
+        makeActive: true,
+      });
       const archived = await host.call("session.saveActiveRevision", { sessionId });
       await append(assistant(laterAnswer, "a later answer on the same branch"));
       const refreshed = await host.call("session.saveActiveRevision", { sessionId });

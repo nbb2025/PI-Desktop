@@ -2,11 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const enEntries: ChangelogEntry[] = [
   {
-    version: "0.24.2",
+    version: "0.24.3",
     date: "2026-11-25",
     highlights: [
       "iAgent image generation and edits use the web studio’s default GPT Image settings.",
       "Chat shows when iAgent accepts an image task. Failures retain the task ID and server HTTP status, and long-running tasks can use the full gateway wait window.",
+      "Configure private roles and skills for each mode, and choose a composer bar to follow active subagents.",
+      "Long Bash commands can continue in the background while the conversation moves on.",
+      "Paste copied image files directly into the composer.",
+      "macOS windows restore reliably after maximizing or leaving full screen.",
+      "The bundled File Manager 0.13.0 adds document tabs, Git history and sync controls, and loading states.",
     ],
   },
   {

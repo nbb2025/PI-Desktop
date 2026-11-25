@@ -2,11 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
-    version: "0.24.2",
+    version: "0.24.3",
     date: "2026-11-25",
     highlights: [
       "A geração e a edição de imagens no iAgent usam as configurações padrão do GPT Image no estúdio web.",
       "A conversa mostra quando o iAgent aceita uma tarefa. Em caso de falha, o ID e o status HTTP do servidor são preservados. Tarefas demoradas podem aguardar até o prazo do gateway.",
+      "Configure funções e habilidades privadas para cada modo. Você pode acompanhar subagentes ativos acima da caixa de mensagem.",
+      "Comandos Bash demorados podem continuar em segundo plano enquanto a conversa prossegue.",
+      "Cole os arquivos de imagem copiados diretamente na caixa de mensagem.",
+      "As janelas do macOS voltam ao tamanho correto ao restaurar após maximizar ou sair da tela cheia.",
+      "O Gerenciador de Arquivos integrado 0.13.0 inclui abas de documentos, histórico e sincronização do Git e indicadores de carregamento.",
     ],
   },
   {

@@ -2,11 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
-    version: "0.24.2",
+    version: "0.24.3",
     date: "2026-11-25",
     highlights: [
       "iAgent verwendet bei der Bilderstellung und -bearbeitung die GPT-Image-Standardeinstellungen des Webstudios.",
       "Im Chat erscheint, sobald iAgent einen Bildauftrag angenommen hat. Bei Fehlern bleiben Auftrags-ID und HTTP-Status erhalten. Lange Aufträge nutzen die volle Wartezeit des Gateways.",
+      "Richte für jeden Modus eigene Rollen und Skills ein. Aktive Subagenten lassen sich in einer Leiste über der Eingabe verfolgen.",
+      "Lange Bash-Befehle können im Hintergrund weiterlaufen, während der Chat fortgesetzt wird.",
+      "Füge kopierte Bilddateien direkt in das Eingabefeld ein.",
+      "macOS-Fenster kehren nach dem Maximieren oder Verlassen des Vollbildmodus zuverlässig zu ihrer vorherigen Größe zurück.",
+      "Der integrierte Dateimanager 0.13.0 bietet Dokument-Tabs, Git-Verlauf, Synchronisierung und Ladeanzeigen.",
     ],
   },
   {

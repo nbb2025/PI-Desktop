@@ -78,6 +78,8 @@ import {
   createProviderCatalogRuntime,
 } from "./runtime/provider-catalog";
 import { createSessionLaunchRuntime } from "./runtime/session-launch";
+import { currentModeBundle } from "./runtime/mode-subagents";
+import { createModeSkillRuntime, enabledModeSkillsOrNone } from "./runtime/mode-skills";
 import { createSessionCoordination } from "./runtime/session-coordination";
 import { createScheduledRuntime } from "./runtime/scheduled";
 import { createDesktopServices } from "./services/desktop-services";
@@ -396,6 +398,8 @@ const {
 } = providerCatalogRuntime;
 
 const createdSessionLaunchRuntime = createSessionLaunchRuntime({
+  getModeBundle: (mode) => currentModeBundle(modeServices.catalog, mode),
+  getModeSkills: (mode) => enabledModeSkillsOrNone(modeServices.catalog, mode),
   runtimeState,
   logger,
   userMcp,
@@ -741,6 +745,17 @@ const modeServices = createModeServices({
   isQuitting: () => mainState.quitting,
 });
 
+/**
+ * Mode-private skill access (issue #2544 §3). Built on the mode catalog so a
+ * mode's `skills/` folder and its `disabledSkills` switches are the only
+ * source; the session's current mode is read from the host on every load, so a
+ * mode switch invalidates the previous menu selection instead of loading it.
+ */
+const modeSkills = createModeSkillRuntime({
+  catalog: modeServices.catalog,
+  getHost,
+});
+
 const planRuntime = createPlanRuntime({
   runtimeState,
   planState: planRuntimeState,
@@ -844,6 +859,10 @@ const sidecarRuntime = createSidecarRuntime({
   sessionProjects,
   loadUserSkillBody,
   activeUserSkills,
+  // A mode-private id is resolved against the session's current mode; a stale
+  // selection (mode switched, skill disabled or moved) throws instead of
+  // falling back to a same-named global skill (issue #2544 §3).
+  loadModeSkillBody: modeSkills.loadForSession,
   // Runtime consumers honor the inline-visualization switch; the Skills page
   // keeps reading the raw host state above.
   disabledBuiltinSkills: runtimeDisabledBuiltinSkills,
