@@ -2,11 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const zhTWEntries: ChangelogEntry[] = [
   {
-    version: "0.24.2",
+    version: "0.24.3",
     date: "2026-11-25",
     highlights: [
       "iAgent 生圖和圖片編輯使用網頁創作工坊的 GPT Image 預設參數。",
       "對話中會顯示 iAgent 已接單。失敗時保留任務編號和伺服器 HTTP 狀態，耗時較長的任務可等到閘道的時限。",
+      "為各個模式配置獨立的角色與技能，或在輸入框上方查看執行中的子代理程式。",
+      "耗時的 Bash 指令可以在背景繼續執行，對話可以接著處理其他工作。",
+      "複製圖片檔案後可直接貼到輸入框。",
+      "修正 macOS 視窗最大化與離開全螢幕後的還原問題。",
+      "內建檔案管理員更新至 0.13.0，新增多文件分頁、Git 歷史與同步操作，並改善載入狀態。",
     ],
   },
   {
