@@ -1,0 +1,230 @@
+{
+  "deepseek": {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "api": "https://api.deepseek.com",
+    "models": {
+      "deepseek-v4-flash": {
+        "id": "deepseek-v4-flash",
+        "name": "DeepSeek V4 Flash",
+        "attachment": true,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "structured_output": true,
+        "modalities": {
+          "input": [
+            "text",
+            "image"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 1048576,
+          "output": 393216
+        }
+      }
+    }
+  },
+  "xiaomi": {
+    "id": "xiaomi",
+    "name": "Xiaomi",
+    "api": "https://api.xiaomimimo.com/v1",
+    "models": {
+      "mimo-v2.5-pro": {
+        "id": "mimo-v2.5-pro",
+        "name": "MiMo-V2.5-Pro",
+        "attachment": false,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "modalities": {
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 1048576,
+          "output": 131072
+        }
+      }
+    }
+  },
+  "digitalocean": {
+    "id": "digitalocean",
+    "name": "DigitalOcean",
+    "api": "https://inference.do-ai.run/v1",
+    "models": {
+      "mimo-v2.5-pro": {
+        "id": "mimo-v2.5-pro",
+        "name": "MiMo V2.5 Pro",
+        "attachment": false,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "modalities": {
+          "input": [
+            "text"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 262144,
+          "output": 262144
+        }
+      }
+    }
+  },
+  "xiaomi-token-plan-cn": {
+    "id": "xiaomi-token-plan-cn",
+    "name": "Xiaomi Token Plan (China)",
+    "api": "https://token-plan-cn.xiaomimimo.com/v1",
+    "models": {
+      "mimo-v2.5-tts": {
+        "id": "mimo-v2.5-tts",
+        "name": "MiMo-V2.5-TTS",
+        "attachment": false,
+        "reasoning": false,
+        "temperature": false,
+        "tool_call": false,
+        "modalities": {
+          "input": [
+            "text"
+          ],
+          "output": [
+            "audio"
+          ]
+        },
+        "limit": {
+          "context": 8192,
+          "output": 8192
+        }
+      }
+    }
+  },
+  "xiaomi-token-plan-sgp": {
+    "id": "xiaomi-token-plan-sgp",
+    "name": "Xiaomi Token Plan (Singapore)",
+    "api": "https://token-plan-sgp.xiaomimimo.com/v1",
+    "models": {
+      "mimo-v2.5-tts": {
+        "id": "mimo-v2.5-tts",
+        "name": "MiMo-V2.5-TTS",
+        "attachment": false,
+        "reasoning": false,
+        "temperature": false,
+        "tool_call": false,
+        "modalities": {
+          "input": [
+            "text"
+          ],
+          "output": [
+            "audio"
+          ]
+        },
+        "limit": {
+          "context": 8192,
+          "output": 8192
+        }
+      }
+    }
+  },
+  "google": {
+    "id": "google",
+    "name": "Google",
+    "models": {
+      "gemini-2.5-pro": {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "attachment": true,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "structured_output": true,
+        "modalities": {
+          "input": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "pdf"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 1048576,
+          "output": 65536
+        }
+      }
+    }
+  },
+  "google-vertex": {
+    "id": "google-vertex",
+    "name": "Vertex",
+    "models": {
+      "gemini-2.5-pro": {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "attachment": true,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "structured_output": true,
+        "modalities": {
+          "input": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "pdf"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 1048576,
+          "output": 65536
+        }
+      }
+    }
+  },
+  "anthropic": {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "models": {
+      "claude-sonnet-4-5": {
+        "id": "claude-sonnet-4-5",
+        "name": "Claude Sonnet 4.5 (latest)",
+        "attachment": true,
+        "reasoning": true,
+        "temperature": true,
+        "tool_call": true,
+        "structured_output": true,
+        "modalities": {
+          "input": [
+            "text",
+            "image",
+            "pdf"
+          ],
+          "output": [
+            "text"
+          ]
+        },
+        "limit": {
+          "context": 200000,
+          "output": 64000
+        }
+      }
+    }
+  }
+}
