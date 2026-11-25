@@ -531,6 +531,15 @@ respectively. Previous portable Windows installs keep manual update
 discovery and can download the current NSIS installer. Existing application
 data stays in the same directory.
 
+The macOS release uses LZMA (`ULMO`) when it makes the Universal DMG smaller.
+The build verifies the compressed image before replacing the original, before
+release checksums or DMG notarization. Both application architectures and
+the drag-to-Applications layout are preserved. Expect a smaller download and
+more time to decompress the image. Installed app size is independent of DMG
+compression. The format requires macOS 10.15 or newer, within the app's
+supported range. Builds with explicit DMG formats, container signing, or
+DMG update metadata keep their configured output.
+
 The manual Linux command targets the native runner architecture and builds
 AppImage, deb, and rpm. RPM targets pass `_build_id_links none` to FPM to
 avoid global build-ID collisions with other applications bundling Electron.

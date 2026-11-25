@@ -91,6 +91,7 @@
     "directories": {
       "output": "release"
     },
+    "artifactBuildCompleted": "../../scripts/compress-macos-dmg.mjs",
     "publish": [
       {
         "provider": "github",

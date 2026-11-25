@@ -226,9 +226,13 @@
 - **Preconditions**: The Release workflow is dispatched with `sign_macos: false`
   or a matching tag is pushed with all Apple signing inputs absent.
 - **Steps**: Verify the Universal app and Rust host with
-  `lipo -verify_arch` for arm64 and x86_64 and verify the ad-hoc signature. Compare the
+  `lipo -verify_arch` for arm64 and x86_64 and verify the ad-hoc signature.
+  Run `hdiutil verify` on the final DMG and copy the app from the mounted image
+  to a temporary directory. Verify the copied app's signature and compare the
   DMG's SHA-512 with the entry in the release description.
-- **Expected**: The lane produces one Universal DMG.
+- **Expected**: The lane produces one mountable Universal DMG, using LZMA
+  (`ULMO`) when it reduces the download size. The copied app passes strict
+  signature verification and includes both architectures.
   Existing manual builds can discover the release and open the DMG download
   page. A tag publishes the assets, and manual dispatch retains them in Actions.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
