@@ -353,6 +353,7 @@ export const ko = {
     sessionMissing: "해당 세션이 더 이상 존재하지 않습니다",
   },
   chat: {
+    iagentImageTaskAccepted: "iAgent가 요청을 수락했습니다. 이미지 대기 중 · {{model}}",
     iagentGroupRate: "배율 ×{{rate}}",
     iagentTokenPrice: "입력 {{input}} · 출력 {{output}} / 토큰 100만 개",
     iagentPricePerRequest: "{{price}} / 요청",

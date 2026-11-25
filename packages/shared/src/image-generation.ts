@@ -88,8 +88,14 @@ export function isImageOnlyChatModel(
     !modelSupportsConversation(modelId, model);
 }
 export const MAX_GENERATED_IMAGES = 10;
+export const IMAGE_GENERATION_CONCURRENCY = 2;
 export const IMAGE_GENERATION_TIMEOUT_MS = 180_000;
-export const IMAGE_BATCH_TIMEOUT_MS = 950_000;
+/** The website allows 30 minutes upstream plus time to publish the result. */
+export const IAGENT_IMAGE_TIMEOUT_MS = 31 * 60_000;
+
+export function imageBatchTimeoutMs(count: number): number {
+  return Math.ceil(count / IMAGE_GENERATION_CONCURRENCY) * IAGENT_IMAGE_TIMEOUT_MS + 180_000;
+}
 export type ImageGenerationItem = { prompt: string; count?: number; images?: string[] };
 export type ImageGenerationInput = { items: ImageGenerationItem[] };
 export type GeneratedImageResult = {

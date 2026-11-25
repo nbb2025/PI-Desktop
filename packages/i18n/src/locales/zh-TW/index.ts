@@ -346,6 +346,7 @@ deleteRunningSessionBlocked: "請先停止執行中的會話，再刪除它。",
     sessionMissing: "該對話已不存在",
   },
   chat: {
+    iagentImageTaskAccepted: "iAgent 已接單，等待圖片 · {{model}}",
     promptRetractionFailed: "無法安全恢復草稿。對話內容已保留。",
     tableActions: "表格操作",
     markdownPlainTextFallback: "內容較長，為維持介面回應速度，現以純文字顯示。",

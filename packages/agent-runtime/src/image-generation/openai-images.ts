@@ -64,9 +64,17 @@ export function openAIImagesAdapter(
         const prompt = context.input.filter(item => item.type === "text").map(item => item.text).join("\n");
         const images = context.input.filter(item => item.type === "image");
         const responseFormat = /^dall-e-[23]$/i.test(model.id) ? "b64_json" : undefined;
+        const modelId = model.id.split("/").at(-1) ?? model.id;
+        const studioDefaults = transport === "iagent-openai" && /^gpt[-_. ]?image/i.test(modelId)
+          ? { size: "1024x1024", quality: "high", output_format: "png", moderation: "auto" }
+          : {};
+        const fields = {
+          model: model.id, prompt, n: 1, ...studioDefaults,
+          ...(responseFormat ? { response_format: responseFormat } : {}),
+        };
         let body: BodyInit;
         if (transport === "iagent-grok") {
-          const editModel = /^grok-imagine-edit$/i.test(model.id.split("/").at(-1) ?? "");
+          const editModel = /^grok-imagine-edit$/i.test(modelId);
           if (editModel !== Boolean(images.length)) throw imageError("IMAGE_EDIT_UNAVAILABLE");
           const references = images.map((image) => ({ image_url: inputImageDataUrl(image.data) }));
           headers.set("Content-Type", "application/json");
@@ -90,22 +98,19 @@ export function openAIImagesAdapter(
           });
         } else if (images.length) {
           const form = new FormData();
-          form.set("model", model.id);
-          form.set("prompt", prompt);
-          form.set("n", "1");
-          if (responseFormat) form.set("response_format", responseFormat);
+          for (const [name, value] of Object.entries(fields)) form.set(name, String(value));
+          const imageField = transport === "iagent-openai" || images.length > 1 ? "image[]" : "image";
           images.forEach((image, index) => {
             const bytes = decodeImageBase64(image.data);
             const type = generatedImageType(bytes);
-            form.append(images.length === 1 ? "image" : "image[]",
+            form.append(imageField,
               new Blob([new Uint8Array(bytes)], { type: type.mimeType }), `input-${index}.${type.extension}`);
           });
           headers.delete("Content-Type");
           body = form;
         } else {
           headers.set("Content-Type", "application/json");
-          body = JSON.stringify({ model: model.id, prompt, n: 1,
-            ...(responseFormat ? { response_format: responseFormat } : {}) });
+          body = JSON.stringify(fields);
         }
         const fetchImpl = options?.fetch ?? fetch;
         const url = imageGenerationUrl(model.baseUrl, images.length > 0);
@@ -113,8 +118,12 @@ export function openAIImagesAdapter(
         const asyncRoute = transport === "iagent-openai" ? `openai-${operation}` as const
           : transport === "iagent-grok" ? `grok-${operation}` as const : undefined;
         const managed = asyncRoute ? await requestIagentImage({
-          route: asyncRoute, model: model.id.split("/").at(-1) ?? model.id,
-          syncPath: new URL(url).pathname, headers, body, signal, fetchImpl,
+          route: asyncRoute, model: modelId,
+          syncPath: new URL(url).pathname.replace(/^\/v1\//, "/"), headers, body, signal, fetchImpl,
+          onAccepted: (id, receipt) => {
+            result.responseId = id;
+            return options?.onResponse?.(receipt, model);
+          },
         }) : undefined;
         const response = managed?.response ?? await fetchImpl(url, {
           method: "POST", headers, redirect: "error", signal, body,

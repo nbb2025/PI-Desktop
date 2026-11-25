@@ -353,6 +353,7 @@ export const tr = {
     sessionMissing: "Bu oturum artık mevcut değil",
   },
   chat: {
+    iagentImageTaskAccepted: "iAgent isteği kabul etti. Görsel bekleniyor · {{model}}",
     iagentGroupRate: "Çarpan ×{{rate}}",
     iagentTokenPrice: "Girdi {{input}} · Çıktı {{output}} / 1 M token",
     iagentPricePerRequest: "{{price}} / istek",

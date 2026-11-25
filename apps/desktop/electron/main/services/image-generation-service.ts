@@ -36,8 +36,9 @@ export function createImageGenerationTool(options: {
   resolveDefault?: (
     edit: boolean, selection?: IagentImageSelection | null,
   ) => Promise<{ endpoint: ImageEndpoint; assertCurrent: () => void } | undefined>;
+  onIagentTaskAccepted?: (task: { sessionId: string; toolCallId: string; modelId: string; taskId: string }) => void;
 }): LocalToolHandler {
-  return async ({ sessionId, args, signal }) => {
+  return async ({ sessionId, toolCallId, args, signal }) => {
     const items = imageGenerationItems(args);
     const host = options.getHost();
     if (!host) return failure("HOST_UNAVAILABLE", "Host unavailable.");
@@ -109,6 +110,9 @@ export function createImageGenerationTool(options: {
       input: args,
       binding: imageBinding,
       onOperation: operation => { operations.push(operation); },
+      onIagentTaskAccepted: ({ taskId }) => {
+        if (!signal.aborted) options.onIagentTaskAccepted?.({ sessionId, toolCallId, modelId: endpoint.modelId, taskId });
+      },
       signal,
       fetchImpl: assertCurrent ? async (input, init) => {
         assertCurrent?.();

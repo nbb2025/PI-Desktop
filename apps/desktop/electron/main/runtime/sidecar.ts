@@ -587,6 +587,15 @@ export function createSidecarRuntime({
     dataDir,
     getHost: () => runtimeState.host,
     resolveDefault: iagent?.imageEndpoint,
+    onIagentTaskAccepted: ({ sessionId, toolCallId, modelId, taskId }) => {
+      const started = activeToolCalls.get(toolKey(sessionId, toolCallId));
+      if (runtimeState.sidecar !== s || started?.toolName !== "GenerateImages") return;
+      emitAgentEvent({
+        sessionId, ts: Date.now(), turnId: started.turnId, agentName: started.agentName,
+        parentToolCallId: started.parentToolCallId, nestedParentToolCallId: started.nestedParentToolCallId,
+        event: { type: "tool_update", toolCallId, partialResult: { kind: "iagent-image-task", modelId, taskId } },
+      });
+    },
     resolveAuth: providerId => vendorOAuth.resolveAuth(providerId),
     resolveImageModel: async (provider, modelId) => {
       await modelsDevCatalog.ensureLoaded();

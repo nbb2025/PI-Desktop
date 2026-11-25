@@ -25,8 +25,9 @@ Render the normal Composer toolbar for an active remote session that denies Stop
   both themes. A newly matched model
   exposes its supported levels, and the gateway receives the selected
   thinking parameter. Chat reuses workspace keys. Image generation creates
-  one media key, sends the model selected in Settings, polls each accepted
-  image task and renders the results.
+  one media key, sends the model selected in Settings, shows the accepted
+  task in the conversation while the fixture withholds its result, then
+  polls the supplied task path and renders the results.
   The groups disappear on sign-out.
 - **Additional coverage:** `iagent-integration.test.mjs` exercises ordering,
   two-factor login, incomplete key inventory, timeouts and account isolation.

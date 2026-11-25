@@ -351,6 +351,7 @@ deleteRunningSessionBlocked: "Stop the running session before deleting it.",
     sessionMissing: "That session no longer exists",
   },
   chat: {
+    iagentImageTaskAccepted: "iAgent accepted the task. Waiting for the image · {{model}}",
     promptRetractionFailed: "Could not safely restore the draft. Your conversation has been preserved.",
     tableActions: "Table actions",
     markdownPlainTextFallback: "Large response shown as plain text to keep the conversation responsive.",

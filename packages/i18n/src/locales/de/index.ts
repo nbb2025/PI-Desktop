@@ -344,6 +344,7 @@ export const de = {
     sessionMissing: "Diese Sitzung existiert nicht mehr",
   },
   "chat": {
+    "iagentImageTaskAccepted": "iAgent hat den Auftrag angenommen. Bild steht aus · {{model}}",
     iagentGroupRate: "Faktor ×{{rate}}",
     iagentTokenPrice: "Eingabe {{input}} · Ausgabe {{output}} / 1 Mio. Token",
     iagentPricePerRequest: "{{price}} / Anfrage",
