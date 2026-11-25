@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,7 +29,7 @@ export function resolveElectronBinary(root = repositoryRoot()) {
   if (!existsSync(binary)) {
     throw new Error("Electron binary missing: " + binary);
   }
-  return { appDir, electronBinary: binary };
+  return { appDir, electronBinary: realpathSync(binary) };
 }
 
 export function assertDesktopBuild(root = repositoryRoot()) {

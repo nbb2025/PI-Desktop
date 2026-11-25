@@ -73,7 +73,7 @@ export function createImageGenerationTool(options: {
         settings.iagentImageGeneration,
       );
       if (!selected) {
-        return failure("IMAGE_NOT_CONFIGURED", "Connect an iAgent account with image access or select an image model in Settings > Models.");
+        return failure("IMAGE_NOT_CONFIGURED", "Connect an iAgent account with image access or select a model in Settings > Models > Image generation model. Call MCP image tools directly.");
       }
       endpoint = selected.endpoint;
       assertCurrent = selected.assertCurrent;
