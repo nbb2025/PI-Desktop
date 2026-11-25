@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "A geração e a edição de imagens no iAgent usam as configurações padrão do GPT Image no estúdio web.",
+      "A conversa mostra quando o iAgent aceita uma tarefa. Em caso de falha, o ID e o status HTTP do servidor são preservados. Tarefas demoradas podem aguardar até o prazo do gateway.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [
