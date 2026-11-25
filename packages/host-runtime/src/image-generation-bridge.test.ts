@@ -4,7 +4,7 @@ import { AgentSidecar, type SidecarHostLink } from "./agent-sidecar.js";
 // A real stdio child forwards requested calls over the production reverse RPC.
 const child = `const rl=require('node:readline').createInterface({input:process.stdin});
 const pending=new Map(); rl.on('line',line=>{const m=JSON.parse(line);
-if(m.method==='probe'){pending.set('r'+m.id,m.id);console.log(JSON.stringify({id:'r'+m.id,method:'host.proxy',params:m.params}));}
+if(m.method==='probe'||m.method==='tools.execute'){pending.set('r'+m.id,m.id);console.log(JSON.stringify({id:'r'+m.id,method:'host.proxy',params:m.params}));}
 else if(pending.has(m.id)){console.log(JSON.stringify({...m,id:pending.get(m.id)}));pending.delete(m.id);}});`;
 const sidecars: AgentSidecar[] = [];
 afterEach(async () => {
@@ -27,7 +27,7 @@ function harness(allowed = true, childSource = child, esm = false) {
   };
   sidecar.setHost(host);
   const execute = (mode = "agent", toolCallId = "i") =>
-    sidecar.call<{ ok: boolean }>("probe", {
+    sidecar.call<{ ok: boolean }>("tools.execute", {
       method: "tools.execute",
       params: {
         sessionId: "s",
@@ -48,6 +48,29 @@ it("authorizes image calls through the host before executing the local handler",
   });
   expect((await execute()).ok).toBe(true);
   expect(calls).toEqual(["tools.execute", "generated"]);
+});
+
+it("lets an accepted image call finish beyond the old 18 minute bridge deadline", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  try {
+    const { sidecar, execute } = harness();
+    let started!: () => void;
+    let finish!: () => void;
+    const ready = new Promise<void>((resolve) => { started = resolve; });
+    const completion = new Promise<void>((resolve) => { finish = resolve; });
+    sidecar.setLocalTool("GenerateImages", async () => {
+      started();
+      await completion;
+      return { ok: true, content: "image" };
+    });
+    const pending = execute().catch((error: unknown) => error);
+    await ready;
+    await vi.advanceTimersByTimeAsync(20 * 60_000);
+    finish();
+    expect(await pending).toEqual({ ok: true, content: "image" });
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("preserves stable local error codes through real reverse RPC", async () => {

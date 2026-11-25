@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const enEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent image generation and edits use the web studio’s default GPT Image settings.",
+      "Chat shows when iAgent accepts an image task. Failures retain the task ID and server HTTP status, and long-running tasks can use the full gateway wait window.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [

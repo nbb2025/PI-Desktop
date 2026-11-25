@@ -288,6 +288,7 @@ export function createIagentIntegration(options: {
         endpoint: {
           providerId: `iagent-image:${current.session.user.id}:${group.id}`,
           vendorKey: "iagent", baseUrl: `${IAGENT_ORIGIN}/v1`, modelId: model, apiKey, authKind: "api_key",
+          headers: { "Accept-Language": options.language() },
           iagentProtocol: protocol,
         },
         assertCurrent,

@@ -22,10 +22,13 @@ describe("iAgent image routes", () => {
         }
         if (path === "/images/generations/async") {
           expect(headers.get("x-iagent-image-route")).toBe("openai-generation");
-          expect(JSON.parse(String(init?.body))).toMatchObject({ model: "gpt-image-2", n: 1 });
-          return Response.json({ task_id: task, status: "processing", poll_url: "https://example.test/credential-trap" }, { status: 202 });
+          expect(JSON.parse(String(init?.body))).toEqual({
+            model: "gpt-image-2.6-sunburst", prompt: "A watercolor cat", n: 1,
+            size: "1024x1024", quality: "high", output_format: "png", moderation: "auto",
+          });
+          return Response.json({ task_id: task, status: "processing", poll_url: `/images/tasks/${task}` }, { status: 202 });
         }
-        expect(path).toBe(`/site-api/image-tasks/${task}`);
+        expect(path).toBe(`/images/tasks/${task}`);
         expect(init?.method).toBe("GET");
         expect(headers.get("authorization")).toBe("Bearer fixture");
         if (++queries === 1) {
@@ -40,7 +43,7 @@ describe("iAgent image routes", () => {
         });
       });
       const batch = generateImageBatch({
-        endpoint: { ...base, iagentProtocol: "openai", modelId: "gpt-image-2" },
+        endpoint: { ...base, iagentProtocol: "openai", modelId: "gpt-image-2.6-sunburst" },
         input: { items: [{ prompt: "A watercolor cat" }] },
         signal: new AbortController().signal, fetchImpl: dispatch,
         save: async () => "/cat.png",
@@ -51,6 +54,71 @@ describe("iAgent image routes", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("reports the receipt before querying and retains it when the upstream times out", async () => {
+    vi.useFakeTimers();
+    try {
+      const taskId = "imgtask_accepted";
+      const accepted = vi.fn();
+      const operation = vi.fn();
+      let queried = false;
+      const dispatch = vi.fn<typeof fetch>(async (url, init) => {
+        const target = new URL(String(url));
+        expect(target.origin).toBe(IAGENT_ORIGIN);
+        if (target.pathname === "/site-api/image-config") return Response.json({ async_enabled: true });
+        if (init?.method === "POST") {
+          return Response.json({
+            task_id: taskId, status: "processing", poll_url: `https://example.test/images/tasks/${taskId}`,
+          }, { status: 202 });
+        }
+        expect(target.pathname).toBe(`/site-api/image-tasks/${taskId}`);
+        expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer fixture");
+        queried = true;
+        return Response.json({ task_id: taskId, status: "failed", http_status: 504 });
+      });
+      const pending = generateImageBatch({
+        endpoint: { ...base, iagentProtocol: "openai", modelId: "gpt-image-2" },
+        input: { items: [{ prompt: "A landscape" }] },
+        signal: new AbortController().signal, fetchImpl: dispatch,
+        save: async () => "/image.png", onOperation: operation, onIagentTaskAccepted: accepted,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(accepted).toHaveBeenCalledExactlyOnceWith({ index: 0, taskId });
+      expect(queried).toBe(false);
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(await pending).toEqual([{ index: 0, status: "failed", errorCode: "IMAGE_HTTP_504" }]);
+      expect(queried).toBe(true);
+      expect(operation).toHaveBeenCalledExactlyOnceWith({ index: 0, text: [], responseId: taskId });
+      expect(dispatch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("uses the website's multipart field and defaults for one GPT Image reference", async () => {
+    const dispatch = vi.fn<typeof fetch>(async (url, init) => {
+      if (String(url).endsWith("/site-api/image-config")) return Response.json({ async_enabled: false });
+      expect(url).toBe(`${IAGENT_ORIGIN}/images/edits`);
+      expect(init?.method).toBe("POST");
+      expect(init?.body).toBeInstanceOf(FormData);
+      const body = init?.body as FormData;
+      expect(Object.fromEntries([...body.entries()].filter(([, value]) => typeof value === "string"))).toEqual({
+        model: "gpt-image-2.6-sunburst", prompt: "Keep the same scene", n: "1",
+        size: "1024x1024", quality: "high", output_format: "png", moderation: "auto",
+      });
+      expect(body.get("image[]")).toBeInstanceOf(Blob);
+      expect(body.has("image")).toBe(false);
+      return Response.json({ data: [{ b64_json: png }] });
+    });
+    const result = await generateImageBatch({
+      endpoint: { ...base, iagentProtocol: "openai", modelId: "gpt-image-2.6-sunburst" },
+      input: { items: [{ prompt: "Keep the same scene", images: ["/fixture.png"] }] },
+      signal: new AbortController().signal, fetchImpl: dispatch,
+      loadImages: async () => [inputImage], save: async () => "/generated.png",
+    });
+    expect(result[0].status).toBe("succeeded");
+    expect(dispatch.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
   it("uses Gemini inline image parts for a reference edit", async () => {

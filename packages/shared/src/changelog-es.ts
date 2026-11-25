@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent usa los ajustes predeterminados de GPT Image del estudio web al generar y editar imágenes.",
+      "El chat indica cuándo iAgent acepta una tarea de imagen. Los fallos conservan el ID y el estado HTTP del servidor. Las tareas largas pueden esperar hasta el límite de la pasarela.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [

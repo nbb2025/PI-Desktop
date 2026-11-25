@@ -1,10 +1,10 @@
 import { usageFromPi } from "../agent-messages.js";
 import { nativeCostStatus, requestUsageIdentity } from "../request-usage.js";
-import { IMAGE_GENERATION_TIMEOUT_MS, imageGenerationItems, type GeneratedImageResult, type MessageUsage } from "@pi-desktop/shared";
+import { IAGENT_IMAGE_TIMEOUT_MS, IMAGE_GENERATION_CONCURRENCY, IMAGE_GENERATION_TIMEOUT_MS, imageGenerationItems, type GeneratedImageResult, type MessageUsage } from "@pi-desktop/shared";
 import { boundedBytes, generatedImageType, imageError, MAX_IMAGE_BYTES, type ImageDownloadOptions } from "./download.js";
 import { decodeImageBase64, safeImageError } from "./openai-images.js";
 import { createImageBinding, type ImageBinding, type ImageEndpoint } from "./binding.js";
-import { IAGENT_IMAGE_TIMEOUT_MS } from "./iagent-tasks.js";
+import { iagentImagePollTarget } from "./iagent-tasks.js";
 export { generatedImageType, MAX_IMAGE_BYTES } from "./download.js";
 export { createImageBinding, type ImageBinding, type ImageEndpoint } from "./binding.js";
 
@@ -37,6 +37,7 @@ export async function generateImageBatch(options: {
   downloadOptions?: ImageDownloadOptions;
   loadImages?: (paths: string[]) => Promise<ImageEditInput[]>;
   onOperation?: (metadata: ImageOperationMetadata) => void;
+  onIagentTaskAccepted?: (task: { index: number; taskId: string }) => void;
 }): Promise<GeneratedImageResult[]> {
   const prompts = imageGenerationItems(options.input);
   const binding = options.binding ?? (options.endpoint && createImageBinding(options.endpoint, options.downloadOptions));
@@ -57,6 +58,8 @@ export async function generateImageBatch(options: {
       const signal = AbortSignal.any([options.signal, controller.signal]);
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       let transportError: string | undefined;
+      let acceptedTaskId: string | undefined;
+      let operationReported = false;
       try {
         const item = prompts[index];
         if (item.images && !options.loadImages) throw imageError("IMAGE_EDIT_UNAVAILABLE");
@@ -69,6 +72,14 @@ export async function generateImageBatch(options: {
           }))],
         }, {
           signal, maxRetries: 0, timeoutMs,
+          onResponse: ({ headers }) => {
+            if (!binding.iagentProtocol || acceptedTaskId) return;
+            const task = iagentImagePollTarget(headers.location);
+            if (task) {
+              acceptedTaskId = task.id;
+              options.onIagentTaskAccepted?.({ index, taskId: task.id });
+            }
+          },
           // Host request policy, not a competing implementation of the native wire protocol.
           fetch: async (url, init) => {
             try {
@@ -101,8 +112,10 @@ export async function generateImageBatch(options: {
           },
         }), signal);
         const usage = usageFromPi(result.usage, { ...identity, costStatus: nativeCostStatus(binding.model.cost) });
+        const responseId = result.responseId ?? acceptedTaskId;
+        operationReported = true;
         options.onOperation?.({ index, text: result.output.filter(part => part.type === "text").map(part => part.text),
-          ...(result.responseId ? { responseId: result.responseId } : {}),
+          ...(responseId ? { responseId } : {}),
           ...(usage ? { usage } : {}),
         });
         signal.throwIfAborted();
@@ -128,9 +141,12 @@ export async function generateImageBatch(options: {
         output.push({ index, status: code === "IMAGE_CANCELLED" ? "cancelled" : "failed", errorCode: code });
       } finally {
         clearTimeout(timer);
+        if (acceptedTaskId && !operationReported) {
+          options.onOperation?.({ index, text: [], responseId: acceptedTaskId });
+        }
       }
     }
   };
-  await Promise.all([worker(), worker()]);
+  await Promise.all(Array.from({ length: IMAGE_GENERATION_CONCURRENCY }, worker));
   return results.flat().map((result, index) => ({ ...result, index }));
 }

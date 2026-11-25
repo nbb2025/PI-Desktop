@@ -215,7 +215,11 @@ function HostToolRow({
     status === "running" ? TOOL_RUNNING_KEYS[action] : TOOL_ACTION_KEYS[action],
   );
   const rawName = getToolDisplayName(message.toolName) || t("chat.tool");
-  const argSummary = getToolSummary(message.toolName, message.toolArgs);
+  const progress = message.toolName === "GenerateImages" && status === "running" ? toolResultPayload(message) : undefined;
+  const argSummary = progress && typeof progress === "object" &&
+    "kind" in progress && progress.kind === "iagent-image-task" && "modelId" in progress && typeof progress.modelId === "string"
+    ? t("chat.iagentImageTaskAccepted", { model: progress.modelId })
+    : getToolSummary(message.toolName, message.toolArgs);
   const previewTarget = PREVIEWABLE_ACTIONS.has(action)
     ? getToolPreviewTarget(message.toolArgs, root)
     : null;

@@ -35,6 +35,10 @@ export function iagentGeminiImages(downloads: ImageDownloadOptions): ProviderIma
           }),
           signal,
           fetchImpl: options.fetch ?? fetch,
+          onAccepted: (id, receipt) => {
+            result.responseId = id;
+            return options.onResponse?.(receipt, model);
+          },
         });
         if (taskId) result.responseId = taskId;
         await options.onResponse?.({ status: response.status, headers: Object.fromEntries(response.headers) }, model);

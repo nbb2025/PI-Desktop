@@ -9,9 +9,9 @@
  * the weight owner's published record for ids the owner states, so a relay-only
  * `deepseek-v4-flash` keeps DeepSeek's window instead of the generic seed.
  *
- * This drives the real handlers with the bundled snapshot, so it pins the whole
- * chain: discovery, endpoint resolution, catalog anchoring, and the hand-typed
- * id channel.
+ * This drives the real handlers with the bundled snapshot and controlled
+ * catalog records to cover discovery, endpoint resolution, catalog anchoring,
+ * and the hand-typed id channel.
  */
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -34,9 +34,9 @@ function jsonResponse(body, status = 200) {
 }
 
 /** Register the real handlers against one row and one served model list. */
-async function handlersFor(t, row, body) {
-  const catalog = new ModelsDevCatalog({ catalogPath });
-  assert.equal(await catalog.ensureLoaded(), true, "the bundled snapshot must load");
+async function handlersFor(t, row, body, snapshotPath = catalogPath) {
+  const catalog = new ModelsDevCatalog({ catalogPath: snapshotPath });
+  assert.equal(await catalog.ensureLoaded(), true, "the catalog snapshot must load");
 
   const original = globalThis.fetch;
   const calls = [];
@@ -201,6 +201,9 @@ test("a relay enriches official IDs, strips safe deployment labels, and preserve
     reseller copies, and only whitelisted deployment labels such as `-1m` are
     stripped as a fallback; semantic variants and release dates stay distinct.
   */
+  // Provider availability and reseller limits change when the bundled
+  // snapshot is refreshed. Use fixed records for this resolver contract.
+  const fixturePath = fileURLToPath(new URL("./fixtures/relay-model-metadata.json", import.meta.url));
   const row = rowOf({ id: "row-4", name: "Relay", baseUrl: "https://relay.example/v1" });
   const { result } = await handlersFor(t, row, {
     data: [
@@ -211,7 +214,7 @@ test("a relay enriches official IDs, strips safe deployment labels, and preserve
       { id: "gemini-2.5-pro-1m" },
       { id: "claude-sonnet-4-5" },
     ],
-  });
+  }, fixturePath);
 
   const byId = new Map(result.models.map((model) => [model.modelId, model]));
 

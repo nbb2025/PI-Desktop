@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const zhTWEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent 生圖和圖片編輯使用網頁創作工坊的 GPT Image 預設參數。",
+      "對話中會顯示 iAgent 已接單。失敗時保留任務編號和伺服器 HTTP 狀態，耗時較長的任務可等到閘道的時限。",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [

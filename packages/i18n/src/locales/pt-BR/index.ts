@@ -343,6 +343,7 @@ export const ptBR = {
     sessionMissing: "Essa sessão não existe mais"
   },
   chat: {
+    iagentImageTaskAccepted: "iAgent aceitou a solicitação. Aguardando a imagem · {{model}}",
     iagentGroupRate: "Fator ×{{rate}}",
     iagentTokenPrice: "Entrada {{input}} · Saída {{output}} / 1 M de tokens",
     iagentPricePerRequest: "{{price}} / solicitação",

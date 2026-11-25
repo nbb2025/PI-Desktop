@@ -54,6 +54,7 @@ const wires = [];
 const requests = [];
 const reasoningRequests = [];
 const imageTasks = new Map();
+let imageTasksCompleted = false;
 let releaseMetadata;
 const metadataReady = new Promise((resolve) => { releaseMetadata = resolve; });
 const reasoningAnswer = "Thinking level received.";
@@ -118,6 +119,7 @@ const server = createServer(async (req, res) => {
       assert.equal(req.method, "POST");
       assert.equal(req.headers.authorization, "Bearer image-key-fixture");
       assert.equal(req.headers["x-iagent-image-route"], "openai-generation");
+      assert.equal(req.headers["accept-language"], "zh-CN");
       let result;
       await chat.handler(req, {
         writeHead(status) { assert.equal(status, 200); },
@@ -127,15 +129,16 @@ const server = createServer(async (req, res) => {
       const task_id = `imgtask_${imageTasks.size + 1}`;
       imageTasks.set(task_id, result);
       res.writeHead(202, { "content-type": "application/json", "retry-after": "1" });
-      return res.end(JSON.stringify({ task_id, status: "processing" }));
+      return res.end(JSON.stringify({ task_id, status: "processing", poll_url: `/site-api/image-tasks/${task_id}` }));
     }
     if (pathname.startsWith("/site-api/image-tasks/")) {
       assert.equal(req.method, "GET");
       assert.equal(req.headers.authorization, "Bearer image-key-fixture");
+      assert.equal(req.headers["accept-language"], "zh-CN");
       const task_id = pathname.split("/").at(-1);
       const result = imageTasks.get(task_id);
       assert.ok(result);
-      return reply(res, { task_id, status: "completed", result });
+      return reply(res, imageTasksCompleted ? { task_id, status: "completed", result } : { task_id, status: "processing" });
     }
     if (pathname === "/site-api/models") return reply(res, { models: catalog, group_order: [40, 10, 50, 20, 30], price_unit: "USD/token" });
     if (pathname === "/site-api/channels") return reply(res, []);
@@ -393,6 +396,10 @@ try {
   await selectModel();
   await closeMenu();
   await sendPrompt("Generate two raster images.");
+  await waitFor(() => evaluate('document.body.innerText.includes("iAgent 已接单，等待图片")'),
+    15_000, "the conversation shows that iAgent accepted the image task");
+  assert.equal(await evaluate('!!document.querySelector(".generated-image-preview img")'), false);
+  imageTasksCompleted = true;
   await waitFor(() => evaluate('document.querySelector(".generated-image-preview img")?.naturalWidth === 480'), 50_000, "Agent-created image preview");
   assert.equal(chat.imageRequests.length, 2);
   assert.deepEqual(chat.imageRequests.map(({ model }) => model), [selectedImageModel, selectedImageModel]);
@@ -407,7 +414,7 @@ try {
   await invoke("iagentLogout");
   assert.deepEqual((await invoke("providersList")).providers, []);
   assert.deepEqual(faults, []);
-  console.log("PASS: iAgent registration link, image model selection and preview, prices, responsive picker, reasoning, key reuse and disconnect");
+  console.log("PASS: iAgent registration link, image model selection, task receipt and preview, prices, responsive picker, reasoning, key reuse and disconnect");
 } catch (error) {
   console.error("Fixture requests", requests, faults, chat.failures);
   if (ws?.readyState === WebSocket.OPEN) console.error(await screen().catch(() => ""));

@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent, görsel oluşturma ve düzenlemede web stüdyosunun varsayılan GPT Image ayarlarını kullanır.",
+      "Sohbet, iAgent’ın görsel görevini kabul ettiğini gösterir. Hatalarda görev kimliği ve sunucunun HTTP durumu korunur. Uzun süren görevler ağ geçidinin bekleme süresini kullanabilir.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [

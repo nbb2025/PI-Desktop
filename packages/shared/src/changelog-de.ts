@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent verwendet bei der Bilderstellung und -bearbeitung die GPT-Image-Standardeinstellungen des Webstudios.",
+      "Im Chat erscheint, sobald iAgent einen Bildauftrag angenommen hat. Bei Fehlern bleiben Auftrags-ID und HTTP-Status erhalten. Lange Aufträge nutzen die volle Wartezeit des Gateways.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [

@@ -1,14 +1,15 @@
 import { IAGENT_ORIGIN, IMAGE_GENERATION_TIMEOUT_MS } from "@pi-desktop/shared";
+import type { ProviderResponse } from "@earendil-works/pi-ai";
 import { boundedBytes, imageError, MAX_IMAGE_BYTES } from "./download.js";
 
-/** The website gives the upstream 30 minutes, followed by result publication. */
-export const IAGENT_IMAGE_TIMEOUT_MS = 31 * 60_000;
 const readTimeout = 20_000;
 const sendTimeout = 60_000;
 const maxResultBytes = Math.ceil(MAX_IMAGE_BYTES * 4 / 3) * 10 + 65536;
 const terminalSuccess = new Set(["completed", "complete", "done", "succeeded", "success"]);
 const terminalFailure = new Set(["failed", "error", "cancelled", "canceled", "expired"]);
 const noAsyncRoute = new Set([404, 405, 501]);
+const taskIdPattern = /^[A-Za-z0-9_-]{1,128}$/;
+const pollPathPattern = /^\/(?:site-api\/image-tasks|(?:v1\/)?images\/tasks)\/([A-Za-z0-9_-]{1,128})$/;
 
 type ImageRoute = "openai-generation" | "openai-edit" | "gemini" | "grok-generation" | "grok-edit";
 type TaskPayload = Record<string, unknown>;
@@ -20,7 +21,22 @@ type ImageSubmission = {
   body: BodyInit;
   signal: AbortSignal;
   fetchImpl: typeof fetch;
+  onAccepted?: (taskId: string, receipt: ProviderResponse) => void | Promise<void>;
 };
+
+export function iagentImagePollTarget(raw: unknown): { id: string; path: string } | undefined {
+  if (typeof raw !== "string" || raw.length > 2048) return undefined;
+  try {
+    const url = new URL(raw, IAGENT_ORIGIN);
+    const id = pollPathPattern.exec(url.pathname)?.[1];
+    if (id && url.origin === IAGENT_ORIGIN && !url.username && !url.password) {
+      return { id, path: url.pathname + url.search };
+    }
+  } catch {
+    // Ignore malformed or untrusted task locations.
+  }
+  return undefined;
+}
 
 function object(payload: unknown): TaskPayload | undefined {
   return payload !== null && typeof payload === "object" && !Array.isArray(payload)
@@ -73,13 +89,17 @@ function taskResult(task: TaskPayload): TaskPayload {
     catch { throw imageError("IMAGE_INVALID_RESPONSE"); }
   }
   const payload = object(result);
-  if (payload) return payload;
-  if (typeof task.image_url === "string") return { data: [{ url: task.image_url }] };
+  if (payload && (Array.isArray(payload.data) && payload.data.length || Array.isArray(payload.candidates) && payload.candidates.length)) {
+    return payload;
+  }
+  if (typeof task.image_url === "string" && task.image_url) {
+    return { ...payload, data: [{ url: task.image_url }] };
+  }
   throw imageError("IMAGE_INVALID_RESPONSE");
 }
 
 export async function requestIagentImage({
-  route, model, syncPath, headers, body, signal, fetchImpl,
+  route, model, syncPath, headers, body, signal, fetchImpl, onAccepted,
 }: ImageSubmission): Promise<{ response: Response; payload: TaskPayload; taskId?: string }> {
   const request = (path: string, timeout: number, init?: RequestInit) =>
     fetchImpl(`${IAGENT_ORIGIN}${path}`, {
@@ -118,15 +138,22 @@ export async function requestIagentImage({
     if (accepted.ok) {
       const task = await readPayload(accepted).catch(() => { throw imageError("IMAGE_SUBMISSION_UNKNOWN"); });
       const id = task.task_id ?? task.id;
-      if (typeof id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+      if (typeof id !== "string" || !taskIdPattern.test(id)) {
         // Older gateways may still return an immediate image.
         if (Array.isArray(task.data) || Array.isArray(task.candidates)) return { response: accepted, payload: task };
         throw imageError("IMAGE_SUBMISSION_UNKNOWN");
       }
-      // Construct the owner-scoped path from the ID. Never forward a key to
-      // a response-supplied URL, including a redirect from the same website.
-      const path = `/site-api/image-tasks/${id}`;
-      const queryHeaders = { Authorization: headers.get("Authorization") ?? "" };
+      const target = iagentImagePollTarget(task.poll_url ?? accepted.headers.get("location"));
+      const path = target?.id === id ? target.path : `/site-api/image-tasks/${id}`;
+      await onAccepted?.(id, {
+        status: accepted.status,
+        headers: { ...Object.fromEntries(accepted.headers), location: path },
+      });
+      const queryHeaders = new Headers();
+      for (const name of ["Authorization", "Accept-Language"]) {
+        const value = headers.get(name);
+        if (value) queryHeaders.set(name, value);
+      }
       let payload = task;
       let response = accepted;
       let failures = 0;
@@ -134,7 +161,11 @@ export async function requestIagentImage({
       while (true) {
         const state = typeof payload.status === "string" ? payload.status.toLowerCase() : "";
         if (terminalSuccess.has(state)) return { response, payload: taskResult(payload), taskId: id };
-        if (terminalFailure.has(state)) throw imageError("IMAGE_TASK_FAILED");
+        if (terminalFailure.has(state)) {
+          const status = payload.http_status;
+          throw typeof status === "number" && Number.isInteger(status) && status >= 400 && status < 600
+            ? statusError(status) : imageError("IMAGE_TASK_FAILED");
+        }
         await waitToPoll(delay, signal);
         let query: { response: Response; payload?: TaskPayload } | undefined;
         try {

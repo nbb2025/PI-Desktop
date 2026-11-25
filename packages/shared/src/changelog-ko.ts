@@ -2,6 +2,14 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.24.2",
+    date: "2026-11-25",
+    highlights: [
+      "iAgent 이미지 생성 및 편집에 웹 스튜디오의 기본 GPT Image 설정을 적용합니다.",
+      "iAgent가 이미지 작업을 접수하면 대화에 표시합니다. 실패 시 작업 ID와 서버 HTTP 상태를 보존하며, 오래 걸리는 작업은 게이트웨이의 제한 시간까지 기다릴 수 있습니다.",
+    ],
+  },
+  {
     version: "0.24.1",
     date: "2026-11-24",
     highlights: [
