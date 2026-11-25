@@ -187,12 +187,13 @@
 - **Acceptance**: Quality (packaging compatibility)
 - **Status**: The archive export is covered by `release-asar.test.mjs`.
 
-## E2E-192a: The iAgent tag publishes exactly two installers
+## E2E-192a: The iAgent tag publishes exactly three installers
 
 - **Steps**: Build a matching tag and inspect the uploaded release assets.
-- **Expected**: The assets contain the Windows installer and Universal DMG.
+- **Expected**: The assets contain one Windows installer and the Apple
+  Silicon and Intel DMGs.
   Publish refuses unexpected files. The resulting description contains the
-  SHA-512 checksum of both installers.
+  SHA-512 checksum for each installer.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Status**: The writer and desktop provider share an installer release fixture.
 
@@ -225,16 +226,17 @@
 
 - **Preconditions**: The Release workflow is dispatched with `sign_macos: false`
   or a matching tag is pushed with all Apple signing inputs absent.
-- **Steps**: Verify the Universal app and Rust host with
-  `lipo -verify_arch` for arm64 and x86_64 and verify the ad-hoc signature.
-  Run `hdiutil verify` on the final DMG and copy the app from the mounted image
-  to a temporary directory. Verify the copied app's signature and compare the
-  DMG's SHA-512 with the entry in the release description.
-- **Expected**: The lane produces one mountable Universal DMG, using LZMA
-  (`ULMO`) when it reduces the download size. The copied app passes strict
-  signature verification and includes both architectures.
-  Existing manual builds can discover the release and open the DMG download
-  page. A tag publishes the assets, and manual dispatch retains them in Actions.
+- **Steps**: In each macOS job, check the app executable, Electron framework
+  and Rust host with `lipo -archs`. Run `hdiutil verify` on its DMG and copy
+  the app from the mounted image to a temporary directory. Verify the copied
+  app's ad-hoc signature and compare the DMG's SHA-512 with the release entry.
+- **Expected**: Each job produces one mountable DMG for its architecture,
+  using LZMA (`ULMO`) when it reduces the download size. The copied app
+  passes strict signature verification and contains the advertised target.
+  Current installers discover the matching update and open the release page.
+  A tag publishes both DMGs, and manual dispatch retains them in Actions.
+  The published notes include the Terminal step
+  `xattr -cr /Applications/PI-Desktop.app` for this manual-install lane.
 - **Specs linked**: `06-delivery/06-release-runbook.md`
 - **Acceptance**: Quality (manual installation)
 - **Milestone**: M6+
@@ -242,15 +244,11 @@
 
 ## E2E-196b: macOS packages omit first-launch helper assets
 
-- **Preconditions**: A macOS packaging run has produced a Universal DMG.
-- **Steps**: 1) Inspect the DMG and confirm the app and Applications link are
-  the only items in its window. 2) In the signed lane, inspect the ZIP root without extracting the
-  app and confirm neither `PI-Desktop-macOS-opening-help.txt` nor
-  `PI-Desktop-macOS-open.command` is present. 3) Confirm the app remains
-  installable from the ZIP.
-- **Expected**: The DMG contains the branded 720×440 background, the app, and
-  the Applications link only. The ZIP contains the app but neither first-launch
-  guidance asset. The same package layout applies to both macOS release lanes.
+- **Preconditions**: A macOS packaging run has produced a native DMG.
+- **Steps**: Inspect the DMG window on each architecture and in each signing
+  lane. Copy the app from the mounted image into an isolated install location.
+- **Expected**: Only the app and Applications link appear on the branded
+  720×440 background. The app can be installed by dragging it.
 - **Specs linked**: `06-delivery/06-release-runbook.md`,
   `05-security/01-security.md`
 - **Acceptance**: Quality, Security
@@ -265,9 +263,9 @@
   (default); GitHub Actions has `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
   `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; the macOS
   release runner is available.
-- **Steps**: 1) Run the tag workflow. 2) Inspect the Universal
-  app with `codesign -dv --verbose=4` and confirm authority
-  the configured publisher's Developer ID Application certificate. 3) Run
+- **Steps**: 1) Run the tag workflow. 2) Inspect each macOS
+  app with `codesign -dv --verbose=4` and confirm it uses the configured
+  publisher's Developer ID Application certificate. 3) Run
   `codesign --verify --deep --strict --verbose=2`,
   `spctl --assess --type execute --verbose=4`, and `xcrun stapler validate`
   against the app, including `Contents/Resources/bin/pi-desktop-host-core`.
@@ -726,10 +724,10 @@ for the active release and updater check.
   2. Inspect ASAR and resource inventories for sidecar, host, production
      modules, source maps, tests/examples/declarations, Chromium locales, and
      native prebuild targets.
-  3. Check the Universal macOS app and `Resources/bin/pi-desktop-host-core`
-     with `lipo -verify_arch` for arm64 and x86_64. Verify the Universal DMG and
-     its SHA-512 in the release description. In the signed lane verify the
-     notarization ticket on the final DMG.
+  3. Check the macOS app and `Resources/bin/pi-desktop-host-core` with
+     `lipo -archs` on each runner. Verify both DMGs and their SHA-512 entries
+     in the release description. In the signed lane verify the notarization
+     ticket on each final DMG.
   4. Inspect the renderer output for its size controls: emitted JS is minified,
      no `.woff` or `.ttf` files are present, only the KaTeX `woff2` faces remain
      (no application font face is emitted any more), and
@@ -747,11 +745,9 @@ for the active release and updater check.
      the sidebar plus startup-splash logos render crisply on a HiDPI display.
 - **Expected**: Each macOS package contains exactly one bundled agent sidecar,
   one Rust host matching its declared architecture, and only configured
-  Chromium locale packs. The release output contains both native macOS
-  architectures, a single DMG, and installer metadata in the release description. Each macOS
-  DMG and ZIP carries its standard `-arm64` or `-x64` architecture marker, and
-  no generic macOS DMG, ZIP, or blockmap remains in the release output. The
-  per-architecture updater metadata points to those names without collisions.
+  Chromium locale packs. The release contains one DMG with an `-arm64`
+  marker and one with an `-x64` marker. The installer metadata in the release
+  description points to each file by its exact name and SHA-512.
   Renderer dependencies
   exist through Vite output rather than duplicate raw
   `node_modules`; dependency source maps, tests, examples, declarations,
@@ -1305,11 +1301,13 @@ Use synthetic Darwin x64/arm64 uname responses through production SSH bootstrap,
 ## E2E-IAGENT-release-feed
 
 - Build a matching tag on the fork. Verify exactly one Windows Universal NSIS
-  installer and one macOS Universal DMG. The Windows installer selects an
+  installer and one macOS DMG per architecture. The Windows installer selects an
   x86 or x64 payload whose Electron and Rust host match the installed OS.
 - The universal Windows release on both architectures discovers the same
   checksum-verified installer through the GitHub Releases API and can download
-  and schedule it for installation. macOS discovers the DMG and links to the
-  Release page for installation. v0.24.0 requires a manual upgrade.
+  and schedule it for installation. macOS prefers the matching native DMG,
+  recognizes older Universal DMGs and links to the release page. Also verify
+  an x64 process running under Rosetta selects arm64. Old macOS Universal
+  builds and Windows v0.24.0 require one manual upgrade.
 - The controller and release-provider tests cover the publish-to-discovery
   path with fixture installers and a controlled updater.

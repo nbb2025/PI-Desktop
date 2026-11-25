@@ -286,7 +286,7 @@ test("packaging exposes only the desktop installers in GitHub Releases", async (
   });
   const macTargets = pkg.build.mac.target.map((entry) => entry.target);
   assert.deepEqual(macTargets, ["dmg"]);
-  assert.match(buildReleaseSource, /"--mac", "dmg", "--universal"/);
+  assert.match(buildReleaseSource, /"--mac", "dmg", `--\$\{macArch\}`/);
   // electron-builder must never self-publish (implicit tag publishing would
   // fail on the missing token and race the softprops release step).
   for (const script of ["dist:mac", "dist:win", "dist:linux"]) {
@@ -333,7 +333,7 @@ test("packaging exposes only the desktop installers in GitHub Releases", async (
     "Windows must launch the pnpm.cmd shim through a shell",
   );
   assert.match(releaseWorkflowSource, /body_path: desktop-release-notes\.md/);
-  assert.match(releaseWorkflowSource, /files: \|\n\s+dist\/PI-Desktop-Setup-\*\.exe\n\s+dist\/PI-Desktop-\*-universal\.dmg\n\s+body_path:/);
+  assert.match(releaseWorkflowSource, /files: \|\n\s+dist\/PI-Desktop-Setup-\*\.exe\n\s+dist\/PI-Desktop-\*-arm64\.dmg\n\s+dist\/PI-Desktop-\*-x64\.dmg\n\s+body_path:/);
 });
 
 test("shared shipped-locale changelog is the in-app notes source of truth", () => {

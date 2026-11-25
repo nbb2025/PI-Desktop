@@ -35,6 +35,11 @@ macOS updates from the merged feed.
 - Publication needs one metadata merge step, and cross-building the other
   architecture requires the matching native runner.
 
+The iAgent fork uses these native lanes with one DMG per architecture and
+publishes each checksum in the release description. See the
+[iAgent release runbook](../spec/06-delivery/06-release-runbook.md#43-github-tag-and-manual-workflow)
+for its update and migration behavior.
+
 ## Alternatives
 
 - Keep macOS arm64-only: rejected because Intel users still cannot install a

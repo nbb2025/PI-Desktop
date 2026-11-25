@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release build for macOS: Developer ID-signed and notarized universal DMG.
+# Release build for macOS: Developer ID-signed and notarized native DMG.
 #
 # Local builds without a certificate remain unsigned. This script injects a
 # real signing identity and requires notarization credentials:
@@ -46,7 +46,7 @@ if [[ ! "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
   exit 1
 fi
 
-echo "==> Packaging the universal desktop (Developer ID signed + notarized)"
+echo "==> Packaging the native macOS desktop (Developer ID signed + notarized)"
 # The packaging wrapper uses `--publish never`; the
 # Release workflow owns publication. The watchdog is transparent: it forwards
 # every line, keeps the child's exit code, and only fails on its own timeout.
@@ -57,7 +57,7 @@ echo "==> Packaging the universal desktop (Developer ID signed + notarized)"
 PI_STAPLER_MAX_ATTEMPTS="${PI_STAPLER_MAX_ATTEMPTS:-6}" \
 PI_STAPLER_RETRY_DELAY_SECONDS="${PI_STAPLER_RETRY_DELAY_SECONDS:-10}" \
 DEBUG="${DEBUG:-electron-osx-sign*,electron-notarize*}" \
-  node scripts/macos-signing-watchdog.mjs --label "release-macos-universal" -- \
+  node scripts/macos-signing-watchdog.mjs --label "release-macos-native" -- \
   pnpm --filter @pi-desktop/desktop run dist:mac \
     -c.mac.identity="${MAC_SIGNING_IDENTITY}" \
     -c.mac.forceCodeSigning=true \

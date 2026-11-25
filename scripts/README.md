@@ -30,7 +30,7 @@ disagrees, so a green `check:release-docs` is a precondition, not a substitute.
 | `macos-signing-watchdog.mjs` | `node scripts/macos-signing-watchdog.mjs [options] -- <command>` | Run a long silent phase (`electron-builder` signing, `notarytool submit --wait`) with a heartbeat, phase tracking, stall diagnostics (last file, `ps` state, codesign log tail), per-file codesign timings, optional bounded app stapler retries, and a hard timeout that fails instead of hanging; it forwards the child output and exit code unchanged and redacts `CSC_KEY_PASSWORD`/`APPLE_APP_SPECIFIC_PASSWORD`/`CSC_LINK` values plus `--password` arguments |
 | `macos-codesign-shim.sh` | used by `macos-signing-watchdog.mjs` | PATH shim that timestamps every `codesign` invocation and then executes the real `codesign`; inert unless `PI_CODESIGN_LOG` is set |
 | `export-linux-asar.mjs` | `node scripts/export-linux-asar.mjs` | Copy the Linux `linux-unpacked/resources/app.asar` into the versioned release asset used for system-Electron repackaging |
-| `build-desktop-release.mjs` | called by the desktop `dist` / `dist:win` scripts | Package the native runner target without publishing. Windows and macOS each use a single universal installer |
+| `build-desktop-release.mjs` | called by the desktop `dist` scripts | Package without publishing. Windows builds one universal installer. macOS builds a DMG for the selected architecture |
 | `check-linux-host-glibc.mjs` | `node scripts/check-linux-host-glibc.mjs [bin]` | Fail a Linux host-core binary whose needed glibc is above 2.35 |
 | `make-icon.py` | `python3 scripts/make-icon.py` | Derive the package PNG, the macOS tray template, and the iconset/ICNS from the canonical PNG |
 | `publish-screenshots.py` | `python3 scripts/publish-screenshots.py` | Publish documentation screenshots |
@@ -120,9 +120,10 @@ version explicitly supplied for a prerelease preview.
 `.github/workflows/release.yml` builds on a `v*.*.*` tag. A `verify` job first
 repeats the `ci.yml` checks (a tag push does not trigger `ci.yml`), and the
 build jobs wait for it. The Windows and macOS runners validate the tag against
-`apps/desktop/package.json` and produce one universal installer each. The
-publishing job accepts those two installers, computes the SHA-512 checksums,
-and places them in the Release description. A tag publishes both installers.
+`apps/desktop/package.json`. The two macOS lanes each build one native DMG.
+The Windows lane builds one universal installer. The publishing job accepts
+exactly those three installers and places their SHA-512 checksums in the
+Release description.
 A manual dispatch retains Actions artifacts. The signed macOS lane
 requires Developer ID and notarization credentials. See the [release
 runbook](../docs/spec/06-delivery/06-release-runbook.md).

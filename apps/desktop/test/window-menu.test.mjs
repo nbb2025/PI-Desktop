@@ -346,7 +346,7 @@ test("Windows/Linux explicit minimize paths use the native taskbar", () => {
   });
   assert.deepEqual(packageJson.build.mac.extraResources, [
     {
-      from: "../../target/release/pi-desktop-host-core",
+      from: "../../target/desktop-release/${arch}/pi-desktop-host-core",
       to: "bin/pi-desktop-host-core",
     },
     {

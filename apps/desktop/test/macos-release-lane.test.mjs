@@ -39,11 +39,11 @@ async function writeStubs(bin, log, repoRoot) {
 printf 'pnpm %s\\n' "$*" >> "${log}"
 case "$*" in
   *'run dist:mac'*)
-    app="${repoRoot}/apps/desktop/release/mac-universal/PI-Desktop.app"
+    app="${repoRoot}/apps/desktop/release/mac-${process.arch}/PI-Desktop.app"
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources/bin"
     : > "$app/Contents/MacOS/PI-Desktop"
     : > "$app/Contents/Resources/bin/pi-desktop-host-core"
-    printf 'disk image' > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-universal.dmg"
+    printf 'disk image' > "${repoRoot}/apps/desktop/release/PI-Desktop-0.0.0-${process.arch}.dmg"
     ;;
 esac
 exit 0
@@ -83,7 +83,7 @@ exit 0
 }
 
 test(
-  "the signed local macOS lane packages the universal installer and notarizes the DMG",
+  "the signed local macOS lane packages the native installer and notarizes the DMG",
   { skip: process.platform !== "darwin" ? "macOS-only lane" : false },
   async (t) => {
     const root = await mkdtemp(join(tmpdir(), "pi-desktop-macos-lane-"));
@@ -149,7 +149,7 @@ test(
       "one DMG submission",
     );
     const releaseDir = join(repoRoot, "apps/desktop/release");
-    const dmg = "PI-Desktop-0.0.0-universal.dmg";
+    const dmg = `PI-Desktop-0.0.0-${process.arch}.dmg`;
     assert.equal(await readFile(join(releaseDir, dmg), "utf8"), "disk image with a stapled ticket");
 
     // The packaging phase stays wrapped, and the watchdog reports its summary.

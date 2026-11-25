@@ -573,10 +573,11 @@ Agent / Plan / Goal
 
 | 系统 | 支持架构 | 安装包 |
 | ---- | -------- | ------ |
-| macOS | Apple 芯片和 Intel | 通用 DMG |
+| macOS | Apple 芯片（arm64） | `-arm64.dmg` |
+| macOS | Intel（x64） | `-x64.dmg` |
 | Windows | x86 和 x64 | 通用 EXE |
 
-Windows 安装包自动选择对应架构，支持应用内更新。macOS 在应用内检查新版，使用 DMG 安装。从 v0.24.0 升级时，请手动下载一次新版安装包。
+Windows 安装包自动选择对应架构，支持应用内更新。macOS 请下载对应架构的 DMG。从通用版升级时，需手动下载一次对应的安装包，此后的 macOS 版本会按架构检查更新。Windows v0.24.0 也需要手动升级一次。
 
 Linux 桌面包可按[发布手册](docs/spec/06-delivery/06-release-runbook.md#6-native-runner-release-packages)本地构建。自动部署 SSH 远程工作区需要另行提供匹配版本的主机包。
 

@@ -138,8 +138,8 @@ test("tag releases only publish desktop installers for Windows and macOS", () =>
   const buildJob = releaseWorkflowSource.match(/^  build:\n[\s\S]*?(?=^  publish:)/m)?.[0];
   assert.ok(buildJob, "release build job is missing");
   assert.deepEqual(
-    [...buildJob.matchAll(/- name: (.* Universal)\n/g)].map(([, name]) => name),
-    ["macOS Universal", "Windows Universal"],
+    [...buildJob.matchAll(/^          - name: (.+)$/gm)].map(([, name]) => name),
+    ["macOS Apple Silicon", "macOS Intel", "Windows Universal"],
   );
   assert.doesNotMatch(buildJob, /dist:linux|AppImage|\.asar|\.rpm|\.deb|latest-linux|Portable/);
   assert.doesNotMatch(releaseWorkflowSource, /pi-host-bundle:|pi-host-\*-linux|latest-ia32\.yml|manual-mac\.yml/);
@@ -166,21 +166,30 @@ test("the Linux package config lets the workflow choose the architecture", () =>
   assert.equal(build.rpm.artifactName, "pi-desktop-${version}-${arch}.${ext}");
 });
 
-test("release jobs verify both architectures inside their universal installers", () => {
-  assert.match(
-    releaseWorkflowSource,
-    /name: macOS Universal[\s\S]*?rust_targets: x86_64-apple-darwin,aarch64-apple-darwin/,
-  );
+test("release jobs verify the native macOS packages and both Windows architectures", () => {
+  for (const [name, os, arch, target] of [
+    ["Apple Silicon", "macos-15", "arm64", "aarch64-apple-darwin"],
+    ["Intel", "macos-15-intel", "x64", "x86_64-apple-darwin"],
+  ]) {
+    assert.ok(releaseWorkflowSource.includes([
+      `name: macOS ${name}`,
+      `            os: ${os}`,
+      `            artifact: mac-${arch}`,
+      "            platform: macos",
+      `            arch: ${arch}`,
+      `            rust_targets: ${target}`,
+    ].join("\n")));
+  }
   assert.match(
     releaseWorkflowSource,
     /name: Windows Universal[\s\S]*?rust_targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc/,
   );
   assert.match(releaseWorkflowSource, /\['win-unpacked', 0x8664\], \['win-ia32-unpacked', 0x14c\]/);
-  assert.match(
-    releaseWorkflowSource,
-    /for arch in arm64 x86_64; do\n.*lipo .*Contents\/MacOS\/PI-Desktop" -verify_arch "\$arch"\n.*lipo .*Contents\/Resources\/bin\/pi-desktop-host-core" -verify_arch "\$arch"/,
-  );
-  assert.match(releaseWorkflowSource, /PI-Desktop-\*-universal\.dmg/);
+  assert.match(releaseWorkflowSource, /lipo -archs "\$app\/Contents\/\$binary"/);
+  assert.match(releaseWorkflowSource, /"\$actual" != "\$macho_arch"/);
+  assert.match(releaseWorkflowSource, /PI-Desktop-\*-arm64\.dmg/);
+  assert.match(releaseWorkflowSource, /PI-Desktop-\*-x64\.dmg/);
+  assert.doesNotMatch(releaseWorkflowSource, /PI-Desktop-\*-universal\.dmg/);
   assert.match(releaseWorkflowSource, /PI-Desktop-Setup-\*\.exe/);
   assert.doesNotMatch(releaseWorkflowSource, /-c\.(?:dmg|zip)\.artifactName/);
 });
@@ -202,12 +211,21 @@ test("macOS Developer ID signing retains the notarization and watchdog requireme
   assert.ok(manualBlock, "macOS manual-install package step is missing");
   assert.match(manualBlock, /env\.MACOS_SIGN_RELEASE != 'true'/);
   assert.match(manualBlock, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/);
+  assert.match(manualBlock, /run dist:mac "--\$MACOS_ARCH"/);
   assert.match(manualBlock, /-c\.mac\.identity=-/);
   assert.match(releaseWorkflowSource, /codesign --verify --deep --strict/);
   assert.doesNotMatch(manualBlock, /CSC_LINK:|CSC_KEY_PASSWORD:|APPLE_/);
   assert.doesNotMatch(manualBlock, /forceCodeSigning|notarize/);
 
   assert.match(releaseWorkflowSource, /Incomplete macOS signing configuration/);
+
+  const publishJob = releaseWorkflowSource.match(/^  publish:\n[\s\S]*$/m)?.[0];
+  assert.ok(publishJob, "release publish job is missing");
+  assert.match(publishJob, /needs: \[configuration, build\]/);
+  assert.match(
+    publishJob,
+    /name: Prepare release notes and installer checksums\s+env:\s+MACOS_SIGN_RELEASE: \$\{\{ needs\.configuration\.outputs\.macos_signed \}\}\s+run: node scripts\/write-desktop-release-notes\.mjs/,
+  );
 
   const signedBlock = releaseWorkflowSource.match(
     /- name: Package signed and notarized macOS installer[\s\S]*?(?=\n      - name:)/,
@@ -244,7 +262,7 @@ test("macOS Developer ID signing retains the notarization and watchdog requireme
   assert.match(signedBlock, /PI_STAPLER_RETRY_DELAY_SECONDS: "10"/);
   assert.match(
     signedBlock,
-    /node scripts\/macos-signing-watchdog\.mjs \\\n\s+--label "dist:mac-universal" \\\n\s+-- pnpm --filter @pi-desktop\/desktop run dist:mac/,
+    /node scripts\/macos-signing-watchdog\.mjs \\\n\s+--label "dist:mac-\$MACOS_ARCH" \\\n\s+-- pnpm --filter @pi-desktop\/desktop run dist:mac "--\$MACOS_ARCH"/,
     "the signed macOS packaging phase runs under the signing watchdog",
   );
   // electron-builder notarizes only the .app; the DMG needs its own
@@ -282,7 +300,7 @@ test("macOS Developer ID signing retains the notarization and watchdog requireme
   assert.doesNotMatch(releaseWorkflowSource, /scripts\/staple-macos-release-dmg\.sh/);
 });
 
-test("the signed local macOS lane uses the universal packaging command", () => {
+test("the signed local macOS lane uses the native packaging command", () => {
   assert.match(releaseMacScriptSource, /run dist:mac /);
   assert.doesNotMatch(releaseMacScriptSource, /-c\.extraMetadata\.piMacUpdates=true/);
   assert.match(
@@ -306,7 +324,7 @@ test("the signed local macOS lane uses the universal packaging command", () => {
   );
   assert.match(
     releaseMacScriptSource,
-    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-universal" --/,
+    /node scripts\/macos-signing-watchdog\.mjs --label "release-macos-native" --/,
     "the local signed macOS lane runs under the signing watchdog",
   );
   assert.match(

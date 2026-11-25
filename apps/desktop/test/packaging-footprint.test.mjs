@@ -229,7 +229,7 @@ test("packaging keeps only shipped locales and excludes non-runtime artifacts", 
   assert.doesNotMatch(JSON.stringify(packageJson.build), /node-pty/);
 });
 
-test("macOS publishes a single Universal DMG", () => {
+test("macOS packages a DMG and host sidecar for the selected architecture", () => {
   const macTargets = packageJson.build.mac.target;
   assert.deepEqual(
     macTargets.map((entry) => entry.target),
@@ -237,8 +237,13 @@ test("macOS publishes a single Universal DMG", () => {
   );
   assert.ok(
     macTargets.every((entry) => entry.arch === undefined),
-    "the release wrapper selects the universal architecture",
+    "the release wrapper selects the architecture for each package",
   );
+  assert.equal(packageJson.build.dmg.artifactName, "PI-Desktop-${version}-${arch}.${ext}");
+  assert.ok(packageJson.build.mac.extraResources.some(({ from, to }) =>
+    from === "../../target/desktop-release/${arch}/pi-desktop-host-core" &&
+    to === "bin/pi-desktop-host-core",
+  ));
   assert.equal(packageJson.build.dmg.writeUpdateInfo, false);
   assert.doesNotMatch(packageJson.scripts["dist:mac"], /--(?:arm64|x64)/);
 });
@@ -271,7 +276,8 @@ test("macOS recompresses the release DMG in place and preserves it on failure", 
   t.after(() => rm(root, { recursive: true, force: true }));
   const contents = join(root, "contents");
   const release = join(root, "release");
-  const file = join(release, "PI-Desktop-0.0.0-universal.dmg");
+  const name = `PI-Desktop-0.0.0-${process.arch}.dmg`;
+  const file = join(release, name);
   await Promise.all([mkdir(contents), mkdir(release)]);
   await writeFile(join(contents, "fixture.txt"), "PI-Desktop DMG fixture\n".repeat(100_000));
   execFileSync("/usr/bin/hdiutil", [
@@ -287,13 +293,13 @@ test("macOS recompresses the release DMG in place and preserves it on failure", 
     encoding: "utf8",
   });
   assert.equal(format.trim(), "ULMO");
-  assert.deepEqual(await readdir(release), ["PI-Desktop-0.0.0-universal.dmg"]);
+  assert.deepEqual(await readdir(release), [name]);
 
   const unreadable = Buffer.from("invalid disk image");
   await writeFile(file, unreadable);
   await assert.rejects(hook(dmgEvent(file)), /hdiutil/);
   assert.deepEqual(await readFile(file), unreadable);
-  assert.deepEqual(await readdir(release), ["PI-Desktop-0.0.0-universal.dmg"]);
+  assert.deepEqual(await readdir(release), [name]);
 });
 
 test("macOS DMG remains a two-icon install and artifacts omit first-launch guidance", () => {

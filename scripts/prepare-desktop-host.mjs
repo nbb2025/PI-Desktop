@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, renameSync } from "node:fs";
+import { copyFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -10,7 +10,10 @@ const windowsTargets = [
   ["x64", "x86_64-pc-windows-msvc"],
   ["ia32", "i686-pc-windows-msvc"],
 ];
-const macTargets = ["aarch64-apple-darwin", "x86_64-apple-darwin"];
+const macTargets = new Map([
+  ["arm64", "aarch64-apple-darwin"],
+  ["x64", "x86_64-apple-darwin"],
+]);
 
 function run(command, args) {
   execFileSync(command, args, { cwd: root, stdio: "inherit" });
@@ -23,39 +26,34 @@ function buildHost(targets = []) {
   ]);
 }
 
-function stageWindowsHost(arch, source) {
+function stageHost(arch, source, name) {
   const folder = join(targetDir, "desktop-release", arch);
   mkdirSync(folder, { recursive: true });
-  copyFileSync(source, join(folder, `${hostName}.exe`));
+  copyFileSync(source, join(folder, name));
 }
 
-export function prepareDesktopHost(universal = false) {
-  if (universal && process.platform === "win32") {
+export function prepareDesktopHost(universalWindows = false, macArch = process.arch) {
+  if (universalWindows && process.platform === "win32") {
     buildHost(windowsTargets.map(([, target]) => target));
     for (const [arch, target] of windowsTargets) {
-      stageWindowsHost(arch, join(targetDir, target, "release", `${hostName}.exe`));
+      const filename = `${hostName}.exe`;
+      stageHost(arch, join(targetDir, target, "release", filename), filename);
     }
     return;
   }
 
-  if (universal && process.platform === "darwin") {
-    buildHost(macTargets);
-    const folder = join(targetDir, "release");
-    mkdirSync(folder, { recursive: true });
-    const binary = join(folder, hostName);
-    const staging = `${binary}.${process.pid}.universal`;
-    run("lipo", [
-      "-create",
-      ...macTargets.map((target) => join(targetDir, target, "release", hostName)),
-      "-output", staging,
-    ]);
-    renameSync(staging, binary);
+  if (process.platform === "darwin") {
+    const target = macTargets.get(macArch);
+    if (!target) throw new Error(`Unsupported macOS architecture: ${macArch}`);
+    buildHost([target]);
+    stageHost(macArch, join(targetDir, target, "release", hostName), hostName);
     return;
   }
 
   buildHost();
   if (process.platform === "win32") {
-    stageWindowsHost(process.arch, join(targetDir, "release", `${hostName}.exe`));
+    const filename = `${hostName}.exe`;
+    stageHost(process.arch, join(targetDir, "release", filename), filename);
   }
 }
 
