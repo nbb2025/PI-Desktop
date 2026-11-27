@@ -548,7 +548,9 @@ and drag-to-Applications layout. Expect a smaller download and
 more time to decompress the image. Installed app size is independent of DMG
 compression. The format requires macOS 10.15 or newer, within the app's
 supported range. Builds with explicit DMG formats, container signing, or
-DMG update metadata keep their configured output.
+DMG update metadata keep their configured output. The artifact hook lives
+under `apps/desktop/build/` so Electron Builder can resolve it when workspace
+detection falls back to the Desktop package directory.
 
 The manual Linux command targets the native runner architecture and builds
 AppImage, deb, and rpm. RPM targets pass `_build_id_links none` to FPM to

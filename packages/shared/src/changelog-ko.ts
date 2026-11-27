@@ -2,7 +2,7 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
-    version: "0.24.4",
+    version: "0.24.5",
     date: "2026-11-27",
     highlights: [
       "Apple Silicon과 Intel용 DMG를 분리해 macOS 다운로드 및 설치 용량을 줄였습니다.",

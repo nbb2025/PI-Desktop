@@ -1,6 +1,6 @@
 {
   "name": "@pi-desktop/desktop",
-  "version": "0.24.4",
+  "version": "0.24.5",
   "desktopName": "pi-desktop.desktop",
   "private": true,
   "description": "PI-Desktop Electron application",
@@ -92,7 +92,7 @@
     "directories": {
       "output": "release"
     },
-    "artifactBuildCompleted": "../../scripts/compress-macos-dmg.mjs",
+    "artifactBuildCompleted": "./build/compress-macos-dmg.mjs",
     "publish": [
       {
         "provider": "github",

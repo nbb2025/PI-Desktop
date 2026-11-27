@@ -2,7 +2,7 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const deEntries: ChangelogEntry[] = [
   {
-    version: "0.24.4",
+    version: "0.24.5",
     date: "2026-11-27",
     highlights: [
       "Getrennte DMGs für Apple Silicon und Intel verringern die Größe von Download und Installation unter macOS.",
