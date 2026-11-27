@@ -2,7 +2,7 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const ptBREntries: ChangelogEntry[] = [
   {
-    version: "0.24.4",
+    version: "0.24.5",
     date: "2026-11-27",
     highlights: [
       "DMGs separados para Apple Silicon e Intel reduzem o tamanho do download e da instalação no macOS.",

@@ -2,7 +2,7 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const zhTWEntries: ChangelogEntry[] = [
   {
-    version: "0.24.4",
+    version: "0.24.5",
     date: "2026-11-27",
     highlights: [
       "macOS 依 Apple 晶片和 Intel 晶片分別打包，縮減下載和安裝體積。",
