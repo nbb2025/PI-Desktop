@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const koEntries: ChangelogEntry[] = [
   {
+    version: "0.24.4",
+    date: "2026-11-27",
+    highlights: [
+      "Apple Silicon과 Intel용 DMG를 분리해 macOS 다운로드 및 설치 용량을 줄였습니다.",
+      "파일 관리자를 한 번 열면 같은 프로젝트의 다른 대화에도 탭이 표시됩니다.",
+      "긴 프롬프트를 접을 수 있으며, 하위 에이전트 메시지는 패널 너비에 맞춰 표시됩니다.",
+      "작업 공간 읽기에서 .npmrc를 보호하며, 감사 로그에서 더 많은 인증 정보 필드를 가립니다.",
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-11-25",
     highlights: [

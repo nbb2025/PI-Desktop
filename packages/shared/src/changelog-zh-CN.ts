@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const zhCNEntries: ChangelogEntry[] = [
   {
+    version: "0.24.4",
+    date: "2026-11-27",
+    highlights: [
+      "macOS 按 Apple 芯片和 Intel 芯片分别打包，减小下载和安装体积。",
+      "在项目中打开一次文件管理器，同项目的其他对话也会出现文件管理器标签页。",
+      "较长的提示词可以折叠，子智能体消息会适应面板宽度。",
+      "工作区读取会保护 .npmrc，审计日志会遮盖更多凭据字段。",
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-11-25",
     highlights: [

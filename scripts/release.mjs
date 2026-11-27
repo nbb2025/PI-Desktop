@@ -11,8 +11,7 @@
  *
  * BEFORE running this for a stable release, update every version-bearing
  * document (D164 + D260, docs/spec/06-delivery/06-release-runbook.md section 4.1):
- *   - the pinned Pi packages supply the model catalog
- *     and committed with the release tag
+ *   - refresh the bundled models.dev catalog before committing the release
  *   - packages/shared/src/changelog*.ts (one entry for <version> in every
  *     shipped locale, matching highlight counts) and its newest-first list in
  *     changelog.test.ts
@@ -26,7 +25,7 @@
  * previewed. Use --skip-docs-check only for a deliberate non-release bump.
  *
  * Pushing the tag triggers .github/workflows/release.yml, which builds the
- * one macOS and one Windows installer and publishes them to GitHub:
+ * two macOS DMGs and one Windows installer and publishes them to GitHub:
  *
  *   git push origin <branch> v<version>
  */

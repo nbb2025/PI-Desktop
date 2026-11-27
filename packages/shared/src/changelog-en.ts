@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const enEntries: ChangelogEntry[] = [
   {
+    version: "0.24.4",
+    date: "2026-11-27",
+    highlights: [
+      "Separate Apple Silicon and Intel DMGs reduce the macOS download and installed size.",
+      "Open File Manager once to get its tab in the other conversations in the project.",
+      "Long prompts collapse, and subagent messages fit the width of their panel.",
+      "Workspace reads protect .npmrc, and audit logs redact more credential fields.",
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-11-25",
     highlights: [
