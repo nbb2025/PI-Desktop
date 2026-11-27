@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { dialog, shell, type BrowserWindow, type IpcMain, type IpcMainInvokeEvent } from "electron";
-import { err, ErrorCodes, IPC, ok, type LifecycleDialogChoice, type Result } from "@pi-desktop/shared";
+import { err, ErrorCodes, IPC, ok, type LifecycleDialogChoice, type ModelInfo, type Result } from "@pi-desktop/shared";
 import type { AgentHostBridge } from "../agent-host-bridge";
 import type { AgentSidecar } from "../agent-sidecar";
 import type { HostProcess } from "../host-process";
@@ -50,6 +50,8 @@ import type { LiveVoiceWidget } from "../live-voice/widget-window";
 import type { IpcRegistrar } from "./types";
 import type { createTraySessions } from "../tray-sessions";
 import type { createTaskbarUnreadBadge } from "../taskbar-unread-badge";
+
+import { registerLanWebUiIpc } from "../lan-webui/ipc";
 
 export type RegisterIpcDependencies = {
   iagent?: IagentIntegration;
@@ -592,9 +594,7 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
   });
 
   registerStartupAnimationIpc({ registrar, dataDir, stripWinLongPrefix });
-
-
-  return async (channel: string, args: readonly unknown[] = []) => {
+  const invokeInternal = async (channel: string, args: readonly unknown[] = []) => {
     const handler = ipcHandlers.get(channel);
     if (!handler) {
       throw Object.assign(new Error(`IPC channel is not available to external agents: ${channel}`), {
@@ -603,4 +603,34 @@ export function registerIpcHandlers(dependencies: RegisterIpcDependencies) {
     }
     return handler(...args);
   };
+
+  // Keep the LAN companion in development until its real-device release gate passes.
+  if (import.meta.env.DEV) {
+    registerLanWebUiIpc({
+      registrar,
+      dataDir,
+      sendToRenderer,
+      log: (level, message, data) => logger.app("runtime", level, message, data === undefined ? undefined : { data }),
+      workspace: {
+        getHost,
+        getBridge: () => getAgentHostBridge(),
+        invoke: (channel, args) => invokeInternal(channel, args),
+        acquireSessionOperation,
+        readCachedModels: async (providerId) => {
+          const result: { models: ModelInfo[] } = await invokeInternal(IPC.invoke.providersListModels, [{ providerId, source: "cache" }]);
+          return result.models;
+        },
+        channels: {
+          sessionCreate: IPC.invoke.sessionCreate,
+          sessionConfigure: IPC.invoke.sessionConfigure,
+          sessionRename: IPC.invoke.sessionRename,
+          projectGroupRename: IPC.invoke.projectGroupRename,
+          agentAbort: IPC.invoke.agentAbort,
+        },
+        activeTurns,
+      },
+    });
+  }
+
+  return invokeInternal;
 }

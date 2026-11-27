@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const esEntries: ChangelogEntry[] = [
   {
+    version: "0.24.4",
+    date: "2026-11-27",
+    highlights: [
+      "Los DMG separados para Apple Silicon e Intel reducen el tamaño de descarga e instalación en macOS.",
+      "Abre una vez el gestor de archivos para que su pestaña aparezca en las demás conversaciones del proyecto.",
+      "Los mensajes largos se pueden plegar y los mensajes de los subagentes se ajustan a su panel.",
+      "La lectura del espacio de trabajo protege .npmrc, y los registros de auditoría ocultan más campos de credenciales.",
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-11-25",
     highlights: [

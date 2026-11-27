@@ -2,6 +2,16 @@ import type { ChangelogEntry } from "./changelog.js";
 
 export const trEntries: ChangelogEntry[] = [
   {
+    version: "0.24.4",
+    date: "2026-11-27",
+    highlights: [
+      "Apple Silicon ve Intel için ayrı DMG dosyaları, macOS indirme ve kurulum boyutunu azaltır.",
+      "Dosya Yöneticisi bir kez açıldığında sekmesi aynı projenin diğer konuşmalarında da görünür.",
+      "Uzun istemler daraltılabilir ve alt ajan mesajları panel genişliğine uyum sağlar.",
+      "Çalışma alanı okumalarında .npmrc korunur ve denetim günlüklerinde daha fazla kimlik bilgisi alanı maskelenir.",
+    ],
+  },
+  {
     version: "0.24.3",
     date: "2026-11-25",
     highlights: [
